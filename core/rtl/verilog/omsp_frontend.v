@@ -74,7 +74,9 @@ module  omsp_frontend (
     mclk_wkup,                         // Main System Clock wake-up (asynchronous)
     nmi_acc,                           // Non-Maskable interrupt request accepted
     pc,                                // Program counter
+    fe_decode,                           // Buffered program counter
     pc_nxt,                            // Next PC value (for CALL & IRQ)
+    irq_detect,
 
 // INPUTs
     cpu_en_s,                          // Enable CPU code execution (synchronous)
@@ -89,6 +91,7 @@ module  omsp_frontend (
     mclk,                              // Main system clock
     mdb_in,                            // Frontend Memory data bus input
     nmi_pnd,                           // Non-maskable interrupt pending
+    // fe_violation,
     nmi_wkup,                          // NMI Wakeup
     pc_sw,                             // Program counter software value
     pc_sw_wr,                          // Program counter software write
@@ -96,7 +99,14 @@ module  omsp_frontend (
     scan_enable,                       // Scan enable (active during scan shifting)
     wdt_irq,                           // Watchdog-timer interrupt
     wdt_wkup,                          // Watchdog Wakeup
-    wkup                               // System Wake-up (asynchronous)
+    wkup,                              // System Wake-up (asynchronous)
+`ifdef HW_DISABLE_IPE_IRQ
+    ipe_executing,
+`elsif SECURE_IRQ_SW
+    ipe_executing,
+    ipe_seg_end,
+`endif
+    pmem_writing,
 );
 
 // OUTPUTs
@@ -127,7 +137,9 @@ output               mclk_enable;      // Main System Clock enable
 output               mclk_wkup;        // Main System Clock wake-up (asynchronous)
 output               nmi_acc;          // Non-Maskable interrupt request accepted
 output        [15:0] pc;               // Program counter
+output               fe_decode;
 output        [15:0] pc_nxt;           // Next PC value (for CALL & IRQ)
+output               irq_detect;
 
 // INPUTs
 //=========
@@ -143,6 +155,7 @@ input  [`IRQ_NR-3:0] irq;              // Maskable interrupts
 input                mclk;             // Main system clock
 input         [15:0] mdb_in;           // Frontend Memory data bus input
 input                nmi_pnd;          // Non-maskable interrupt pending
+// input                fe_violation;
 input                nmi_wkup;         // NMI Wakeup
 input         [15:0] pc_sw;            // Program counter software value
 input                pc_sw_wr;         // Program counter software write
@@ -151,6 +164,13 @@ input                scan_enable;      // Scan enable (active during scan shifti
 input                wdt_irq;          // Watchdog-timer interrupt
 input                wdt_wkup;         // Watchdog Wakeup
 input                wkup;             // System Wake-up (asynchronous)
+`ifdef HW_DISABLE_IPE_IRQ
+input                ipe_executing;
+`elsif SECURE_IRQ_SW
+input                ipe_executing;
+input         [15:0] ipe_seg_end;
+`endif
+input                pmem_writing;
 
 
 //=============================================================================
@@ -204,12 +224,14 @@ endfunction
 // 2.1) Instruction State machine definitons
 //-------------------------------------------
 
+parameter I_IRQ_PRE   = `I_IRQ_PRE;
 parameter I_IRQ_FETCH = `I_IRQ_FETCH;
 parameter I_IRQ_DONE  = `I_IRQ_DONE;
 parameter I_DEC       = `I_DEC;        // New instruction ready for decode
 parameter I_EXT1      = `I_EXT1;       // 1st Extension word
 parameter I_EXT2      = `I_EXT2;       // 2nd Extension word
 parameter I_IDLE      = `I_IDLE;       // CPU is in IDLE mode
+parameter I_BOOTCODE  = `I_BOOTCODE;   // Executing bootcode
 
 //
 // 2.2) Execution State machine definitons
@@ -229,6 +251,7 @@ parameter E_DST_WR    = `E_DST_WR;
 parameter E_EXEC      = `E_EXEC;
 parameter E_JUMP      = `E_JUMP;
 parameter E_IDLE      = `E_IDLE;
+parameter E_DST_WD    = `E_DST_WD;
 
 
 //=============================================================================
@@ -254,11 +277,12 @@ wire   cpu_halt_req = cpu_halt_cmd | ~cpu_en_s;
 always @(i_state    or inst_sz  or inst_sz_nxt  or pc_sw_wr or exec_done or
          irq_detect or cpuoff   or cpu_halt_req or e_state)
     case(i_state)
-      I_IDLE     : i_state_nxt = (irq_detect & ~cpu_halt_req) ? I_IRQ_FETCH :
+      I_IDLE     : i_state_nxt = (irq_detect & ~cpu_halt_req) ? I_IRQ_PRE :
                                  (~cpuoff    & ~cpu_halt_req) ? I_DEC       : I_IDLE;
+      I_IRQ_PRE  : i_state_nxt =  I_IRQ_FETCH;
       I_IRQ_FETCH: i_state_nxt =  I_IRQ_DONE;
       I_IRQ_DONE : i_state_nxt =  I_DEC;
-      I_DEC      : i_state_nxt =  irq_detect                  ? I_IRQ_FETCH :
+      I_DEC      : i_state_nxt =  irq_detect                  ? I_IRQ_PRE   :
                           (cpuoff | cpu_halt_req) & exec_done ? I_IDLE      :
                             cpu_halt_req & (e_state==E_IDLE)  ? I_IDLE      :
                                   pc_sw_wr                    ? I_DEC       :
@@ -267,20 +291,23 @@ always @(i_state    or inst_sz  or inst_sz_nxt  or pc_sw_wr or exec_done or
       I_EXT1     : i_state_nxt =  pc_sw_wr                    ? I_DEC       :
                                   (inst_sz!=2'b01)            ? I_EXT2      : I_DEC;
       I_EXT2     : i_state_nxt =  I_DEC;
+      I_BOOTCODE : i_state_nxt =  I_DEC;
     // pragma coverage off
-      default    : i_state_nxt =  I_IRQ_FETCH;
+      default    : i_state_nxt =  I_IRQ_PRE;
     // pragma coverage on
     endcase
 
 // State machine
 always @(posedge mclk or posedge puc_rst)
-  if (puc_rst) i_state  <= I_IRQ_FETCH;
+  if (puc_rst) i_state  <= I_BOOTCODE;
   else         i_state  <= i_state_nxt;
 
 // Utility signals
 wire   decode_noirq =  ((i_state==I_DEC) &  (exec_done | (e_state==E_IDLE)));
 wire   decode       =  decode_noirq | irq_detect;
 wire   fetch        = ~((i_state==I_DEC) & ~(exec_done | (e_state==E_IDLE))) & ~(e_state_nxt==E_IDLE);
+
+assign fe_decode = decode;
 
 // Halt/Run CPU status
 reg    cpu_halt_st;
@@ -304,7 +331,13 @@ always @(posedge mclk or posedge puc_rst)
   else if (exec_done)           inst_irq_rst <= 1'b0;
 
 //  Detect other interrupts
-assign  irq_detect = (nmi_pnd | ((|irq | wdt_irq) & gie)) & ~cpu_halt_req & ~cpu_halt_st & (exec_done | (i_state==I_IDLE));
+
+wire irq_detect_helper = (nmi_pnd | ((|irq | wdt_irq) & gie)) & ~cpu_halt_req & ~cpu_halt_st & (exec_done | (i_state==I_IDLE));
+`ifdef HW_DISABLE_IPE_IRQ
+assign  irq_detect = irq_detect_helper & ~ipe_executing;
+`else
+assign  irq_detect = irq_detect_helper;
+`endif
 
 `ifdef CLOCK_GATING
 wire       mclk_irq_num;
@@ -340,8 +373,25 @@ always @(posedge mclk_irq_num or posedge puc_rst)
 `endif
                        irq_num <= get_irq_num(irq_all);
 
+
 // Generate selected IRQ vector address
+`ifdef SECURE_IRQ_SW
+    // if interrupting IPE, use IVT included at the end of IPE region, otherwise use regular IVT
+    wire [6:0] irq_idx       = irq_num - 48;
+    wire [15:0] irq_addr     = ipe_executing ?
+                                 {(ipe_seg_end - 16'd32) + {irq_idx, 1'b0}} :
+                                 {9'h1ff, irq_num, 1'b0};
+`else
+  `ifdef SECURE_IRQ_FW
+    // route interrupt to dedicated firmware jump table
+    wire [15:0] bootcode_end = (`BMEM_BASE + `BMEM_SIZE - 32);
+    wire [6:0] irq_idx       = irq_num - 48;
+    wire [15:0] irq_addr     = bootcode_end + {irq_idx, 1'b0};
+  `else
+// get ISR address directly from regular IVT
 wire [15:0] irq_addr    = {9'h1ff, irq_num, 1'b0};
+  `endif
+`endif
 
 // Interrupt request accepted
 wire        [63:0] irq_acc_all = one_hot64(irq_num) & {64{(i_state==I_IRQ_FETCH)}};
@@ -408,12 +458,16 @@ reg  [15:0] pc;
 // Compute next PC value
 wire [15:0] pc_incr = pc + {14'h0000, fetch, 1'b0};
 wire [15:0] pc_nxt  = pc_sw_wr               ? pc_sw    :
-                      (i_state==I_IRQ_FETCH) ? irq_addr :
-                      (i_state==I_IRQ_DONE)  ? mdb_in   :  pc_incr;
+                      (i_state==I_IRQ_PRE)   ? irq_addr :
+                      (i_state==I_IRQ_FETCH) ? mdb_in :
+                      (i_state==I_BOOTCODE)  ? `BMEM_BASE :
+                      (i_state==I_IRQ_DONE)  ? pc   :
+                      pc_incr;
 
 `ifdef CLOCK_GATING
 wire       pc_en  = fetch                  |
                     pc_sw_wr               |
+                    (i_state==I_IRQ_PRE)   |
                     (i_state==I_IRQ_FETCH) |
                     (i_state==I_IRQ_DONE);
 wire       mclk_pc;
@@ -425,7 +479,7 @@ wire       mclk_pc = mclk;
 
 always @(posedge mclk_pc or posedge puc_rst)
   if (puc_rst)  pc <= 16'h0000;
-  else          pc <= pc_nxt;
+  else pc <= pc_nxt;
 
 // Check if Program-Memory has been busy in order to retry Program-Memory access
 reg pmem_busy;
@@ -434,9 +488,8 @@ always @(posedge mclk or posedge puc_rst)
   else          pmem_busy <= fe_pmem_wait;
 
 // Memory interface
-wire [15:0] mab      = pc_nxt;
-wire        mb_en    = fetch | pc_sw_wr | (i_state==I_IRQ_FETCH) | pmem_busy | (cpu_halt_st & ~cpu_halt_req);
-
+wire [15:0] mab      = (i_state==I_IRQ_FETCH)? irq_addr : pc_nxt;
+wire        mb_en    = fetch | pc_sw_wr | (i_state==I_IRQ_FETCH) | (i_state==I_IRQ_PRE) | pmem_busy | (cpu_halt_st & ~cpu_halt_req);
 
 //
 // 5.2) INSTRUCTION REGISTER
@@ -903,6 +956,7 @@ always @(e_state       or dst_acalc     or dst_rd   or inst_sext_rdy or
 
       E_JUMP   : e_state_nxt =  e_first_state;
       E_DST_WR : e_state_nxt =  exec_jmp          ? E_JUMP   : e_first_state;
+      E_DST_WD : e_state_nxt =  e_first_state;
       E_SRC_WR : e_state_nxt =  e_first_state;
     // pragma coverage off
       default  : e_state_nxt =  E_IRQ_0;
@@ -911,16 +965,17 @@ always @(e_state       or dst_acalc     or dst_rd   or inst_sext_rdy or
 
 // State machine
 always @(posedge mclk or posedge puc_rst)
-  if (puc_rst) e_state  <= E_IRQ_1;
-  else         e_state  <= e_state_nxt;
+  if (puc_rst)           e_state <= E_IRQ_1;
+  else if (pmem_writing & e_state != E_IRQ_1 & e_state != E_IRQ_3) e_state <= E_DST_WD;  // TODO: this is a quick fix to allow writing to the stack from the IRQ handler, even if it points to "FRAM"
+  else                   e_state <= e_state_nxt;
 
 
 // Frontend State machine control signals
 //----------------------------------------
 
 wire exec_done = exec_jmp        ? (e_state==E_JUMP)   :
-                 exec_dst_wr     ? (e_state==E_DST_WR) :
-                 exec_src_wr     ? (e_state==E_SRC_WR) : (e_state==E_EXEC);
+                 exec_dst_wr     ? (e_state==E_DST_WR & ~pmem_writing) :
+                 exec_src_wr     ? (e_state==E_SRC_WR) : (e_state==E_EXEC | e_state==E_DST_WD);
 
 
 //=============================================================================

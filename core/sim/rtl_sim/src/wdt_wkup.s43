@@ -90,6 +90,10 @@
 main:
 		
         /* --------------   WATCHDOG TEST:  WAKE-UP INTERVAL MODE   ------------ */
+	; NOTE: timing alignment due to bootcode execution
+.rept 10
+	nop
+.endr
 
 	mov   &IFG1, r4
 	cmp #0x0001, &IFG1        ;# Check if we come out of a watchdog reset

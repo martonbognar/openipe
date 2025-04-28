@@ -1,0 +1,223 @@
+.include "../bin/ipe_macros.asm"
+
+; IPE dispatcher for handling interrupts during protected code execution: divert
+; IPE execution to unprotected handler and back
+
+; Instead of having to pass a parameter, we reconstruct the interrupt identifier
+; based on entry location
+
+; TODO: bootcode_irq_num should probably be reset from the firmware to prevent
+; problems if device is reset (loses power) during interrupt handling
+
+bootcode_isr_0:
+    dec &bootcode_irq_num
+bootcode_isr_1:
+    dec &bootcode_irq_num
+bootcode_isr_2:
+    dec &bootcode_irq_num
+bootcode_isr_3:
+    dec &bootcode_irq_num
+bootcode_isr_4:
+    dec &bootcode_irq_num
+bootcode_isr_5:
+    dec &bootcode_irq_num
+bootcode_isr_6:
+    dec &bootcode_irq_num
+bootcode_isr_7:
+    dec &bootcode_irq_num
+bootcode_isr_8:
+    dec &bootcode_irq_num
+bootcode_isr_9:
+    dec &bootcode_irq_num
+bootcode_isr_10:
+    dec &bootcode_irq_num
+bootcode_isr_11:
+    dec &bootcode_irq_num
+bootcode_isr_12:
+    dec &bootcode_irq_num
+bootcode_isr_13:
+    dec &bootcode_irq_num
+bootcode_isr_14:
+    dec &bootcode_irq_num
+bootcode_isr_15:
+    dec &bootcode_irq_num
+
+bootcode_isr:
+    mov &bootcode_irq_num, &IRQ_NUM ; TODO: why?
+    mov #16, &bootcode_irq_num
+
+    tst &IPE_ACTIVE
+    jz exec_untrusted
+
+exec_ipe:
+    /*
+     * If we continue executing here, the interrupted code ran in IPE
+     */
+
+    ; Nemesis mitigation here
+    ; will we mitigate interrupt counting attacks?
+
+    mov #0x0, &TACTL
+
+    ; 68 cycles pass between the start of IRQ and here, we need to calculate how many more cycles happened before
+    ; but it happens in cycles of TACCR0+1
+
+    push r15
+    mov &TAR, r15
+
+calc_offset:
+    ; take modulo 6 of TAR
+    cmp #69, r15
+    jge calc_offset_done
+    add &TACCR0, r15
+    add #1, r15
+    jmp calc_offset
+
+calc_offset_done:
+    sub #68, r15
+    push r14
+    ; save number of padding cycles to IPE to perform exit padding
+    get_ipe_end r14
+    mov r15, -34(r14)
+    pop r14
+    ; shift 2 => offset
+    add r15, r15
+    add #nemesis_mitigation, r15
+    br r15
+
+nemesis_mitigation_return:
+    ; reti padding: probably needs to be handled by IPE entry code: write number of cycles to dedicated location? what happens on nested interrupts though?
+    ; save offset in IPE memory, location calculated from second boundary register
+
+    ; check if handler is also in IPE
+    mov &IRQ_NUM, r15
+    tst ivt_jump_in_ipe(r15)
+    pop r15
+
+    jz exec_ipe_isr_untrusted
+
+exec_ipe_isr_ipe:
+
+    ; we interrupted IPE and will handle in IPE, can just jump there
+    push r15
+    get_ipe_end r15
+    sub #0x20, r15
+    add &IRQ_NUM, r15
+    add &IRQ_NUM, r15
+    mov @r15, &IRQ_NUM ; take address from IPE IVT
+    pop r15
+    br &IRQ_NUM
+
+exec_ipe_isr_untrusted:
+    ; we interrupted IPE and it will be handled in untrusted code
+
+    ; add #2, r1  ; drop the status register from the stack, IPE will use `ret` to pop the return address
+    ; TODO: we can detect the interrupt through the cycle timing memory location, then we shouldn't drop the status register to preserve functionality
+
+    ; push registers to IPE stack and clear (this needs to be done in the same order as in the IPE calling conventions)
+    push_all_regs
+    clear_all_regs
+
+    mov &IRQ_NUM, r8
+
+    get_ipe_end r15
+    sub #0x20, r15
+    add &IRQ_NUM, r15
+    add &IRQ_NUM, r15
+    br @r15
+
+exec_untrusted:
+    /*
+     * If we continue executing here, the interrupted code was unprotected
+     */
+
+    ; check if handler is also in untrusted
+    push r15
+    mov &IRQ_NUM, r15
+    tst ivt_jump_in_ipe(r15)
+    pop r15
+
+    jz exec_untrusted_isr_untrusted
+
+exec_untrusted_isr_ipe:
+    ; handler is in IPE
+
+    ; back up registers on the unprotected stack
+    push_all_regs
+
+    mov #-1, r7
+    mov &IRQ_NUM, r8  ; identifier of ISR in r8
+
+    mov r8, r15
+    add r15, r15
+    add #0xffe0, r15  ; get address from untrusted IVT
+    push @r15
+
+    get_ipe_entry r15
+    br r15
+
+
+exec_untrusted_isr_untrusted:
+    ; we interrupted untrusted code and handler is also in untrusted
+    push r15
+    mov &IRQ_NUM, r15
+    add r15, r15
+    add #0xffe0, r15  ; get address from untrusted IVT
+    mov @r15, &IRQ_NUM
+    pop r15
+    br &IRQ_NUM
+
+
+nemesis_mitigation:
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    br #nemesis_mitigation_return
+
+
+/* ************************************************************************* */
+    ; secured nonvolatile system data area
+bootcode_irq_num:
+    .word 16
+
+; TODO: simplify to a single bitvector
+ivt_jump_in_ipe:
+    .byte 0
+    .byte 0
+    .byte 0
+    .byte 0
+    .byte 0
+    .byte 0
+    .byte 0
+    .byte 0
+    .byte 0
+    .byte 0
+    .byte 1
+    .byte 0
+    .byte 0
+    .byte 0
+    .byte 0
+    .byte 0
+
+    .sect ".bootcode_ivt", "a"
+bootcode_ivt:
+   .word bootcode_isr_0
+   .word bootcode_isr_1
+   .word bootcode_isr_2
+   .word bootcode_isr_3
+   .word bootcode_isr_4
+   .word bootcode_isr_5
+   .word bootcode_isr_6
+   .word bootcode_isr_7
+   .word bootcode_isr_8
+   .word bootcode_isr_9
+   .word bootcode_isr_10
+   .word bootcode_isr_11
+   .word bootcode_isr_12
+   .word bootcode_isr_13
+   .word bootcode_isr_14
+   .word bootcode_isr_15

@@ -5,7 +5,7 @@
 ###############################################################################
 
 # Enable/Disable waveform dumping
-OMSP_NODUMP=0
+OMSP_NODUMP=1
 export OMSP_NODUMP
 
 # Choose GCC toolchain prefix ('msp430' for MSPGCC / 'msp430-elf' for GCC RedHat/TI)

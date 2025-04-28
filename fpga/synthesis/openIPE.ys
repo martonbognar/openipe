@@ -1,0 +1,9 @@
+read_verilog ../../core/bench/verilog/ram.v
+read_verilog ../../core/rtl/verilog/periph/*.v
+read_verilog ../../core/rtl/verilog/*.v
+read_verilog ../xilinx_avnet_lx9microbard/rtl/verilog/io_mux.v
+read_verilog ../xilinx_avnet_lx9microbard/rtl/verilog/omsp_uart.v
+read_verilog ../xilinx_avnet_lx9microbard/rtl/verilog/driver_7segment.v
+read_verilog openIPE_fpga.v
+synth_xilinx -top openIPE_fpga
+write_json output.json

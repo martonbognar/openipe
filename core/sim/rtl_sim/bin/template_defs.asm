@@ -122,6 +122,14 @@
 .set    TAIV,      0x012E
 
 /*---------------------------------------------------------------------------*/
+/*                                   IPE                                     */
+/*---------------------------------------------------------------------------*/
+.set    IPE_ACTIVE, 0x05A8
+.set    MPUIPC0,    0x05AA
+.set    MPUIPSEGB2, 0x05AC
+.set    MPUIPSEGB1, 0x05AE
+
+/*---------------------------------------------------------------------------*/
 /*                          DATA MEMORY MAPPING                              */
 /*---------------------------------------------------------------------------*/
 .set    DMEM_BASE, PER_SIZE
@@ -255,3 +263,9 @@
 
 .set    PMEM_LENGTH,     PMEM_SIZE
 .set    PMEM_EDE_LENGTH, PMEM_EDE_SIZE
+
+.set    BMEM_BASE,       BMEM_BASE_VAL
+.set    BMEM_LENGTH,     BMEM_SIZE
+
+.set    IRQ_TRAMPOLINE,  0xff90
+.set    IRQ_NUM,         0xffb0

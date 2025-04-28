@@ -122,7 +122,7 @@ for file in $LOG_DIR/*.log ; do
     dma_error=`grep "Total Errors" $file`
     dma_error_arr=($dma_error)
     dma_error_arr[2]="${dma_error_arr[2]}"
-    if [ $abort_ok == 0 ]; then
+    if [ $abort_ok == 0 ] && [ -n "$dma_error" ]; then
 	if [ ${dma_error_arr[2]} -ne " 0" ]; then
 	    dma_error_arr[2]="${red}  ${dma_error_arr[2]} ${normal}"
 	fi
@@ -201,3 +201,6 @@ echo    ""
 echo    "         Make sure passed+skipped == total"
 echo    ""
 echo    ""
+
+num=$(( $failed_nr + $aborted_nr ))
+exit $num

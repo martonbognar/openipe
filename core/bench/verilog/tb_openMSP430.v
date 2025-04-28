@@ -54,6 +54,13 @@ wire        [15:0] dmem_din;
 wire         [1:0] dmem_wen;
 wire        [15:0] dmem_dout;
 
+// Bootcode Memory interface
+wire [`BMEM_MSB:0] bmem_addr;
+wire               bmem_cen;
+wire        [15:0] bmem_din;
+wire         [1:0] bmem_wen;
+wire        [15:0] bmem_dout;
+
 // Program Memory interface
 wire [`PMEM_MSB:0] pmem_addr;
 wire               pmem_cen;
@@ -206,6 +213,8 @@ integer            tb_idx;
 integer            tmp_seed;
 integer            error;
 reg                stimulus_done;
+reg                stimulus_kill;
+reg [63:0] time_clk;
 
 
 //
@@ -220,7 +229,17 @@ reg                stimulus_done;
 `include "dbg_i2c_tasks.v"
 
 // Direct Memory Access interface tasks
-`include "dma_tasks.v"
+// NOTE: we disable concurrent DMA tests as they are not IPE-aware
+// and we test DMA protection for IPE separately
+`ifndef __IPE_SIM
+  `include "dma_tasks.v"
+`else
+  integer    dma_cnt_wr;
+  integer    dma_cnt_rd;
+  integer    dma_wr_error;
+  integer    dma_rd_error;
+  reg        dma_tfx_cancel;
+`endif
 
 // Verilog stimulus
 `include "stimulus.v"
@@ -235,8 +254,16 @@ initial
      for (tb_idx=0; tb_idx < `DMEM_SIZE/2; tb_idx=tb_idx+1)
        dmem_0.mem[tb_idx] = 16'h0000;
 
-     // Initialize program memory
+     // Initialize program and bootcode memory
      #10 $readmemh("./pmem.mem", pmem_0.mem);
+     #10 $readmemh("./bmem.mem", bmem_0.mem);
+
+     // Sanitity check bootcode firmware was provided correctly
+     if (bmem_0.mem[0] === 8'h00)
+     begin
+       $error("Bootcode is null!");
+       $finish;
+     end
   end
 
 
@@ -284,6 +311,7 @@ initial
      tmp_seed                = $urandom(tmp_seed);
      error                   = 0;
      stimulus_done           = 1;
+     stimulus_kill           = 0;
      irq                     = {`IRQ_NR-2{1'b0}};
      nmi                     = 1'b0;
      wkup                    = 14'h0000;
@@ -330,6 +358,10 @@ initial
      scan_mode               = 1'b0;
   end
 
+always @(posedge mclk) begin
+  if (puc_rst) time_clk <= 0;
+  else   time_clk <= time_clk + 1;
+end
 
 //
 // Program Memory
@@ -348,6 +380,22 @@ ram #(`PMEM_MSB, `PMEM_SIZE) pmem_0 (
     .ram_wen           (pmem_wen)              // Program Memory write enable (low active)
 );
 
+//
+// Bootcode Memory
+//----------------------------------
+
+ram #(`BMEM_MSB, `BMEM_SIZE) bmem_0 (
+
+// OUTPUTs
+    .ram_dout          (bmem_dout),            // Bootcode Memory data output
+
+// INPUTs
+    .ram_addr          (bmem_addr),            // Bootcode Memory address
+    .ram_cen           (bmem_cen),             // Bootcode Memory chip enable (low active)
+    .ram_clk           (mclk),                 // Bootcode Memory clock
+    .ram_din           (bmem_din),             // Bootcode Memory data input
+    .ram_wen           (bmem_wen)              // Bootcode Memory write enable (low active)
+);
 
 //
 // Data Memory
@@ -400,6 +448,10 @@ openMSP430 dut (
     .pmem_cen          (pmem_cen),             // Program Memory chip enable (low active)
     .pmem_din          (pmem_din),             // Program Memory data input (optional)
     .pmem_wen          (pmem_wen),             // Program Memory write byte enable (low active) (optional)
+    .bmem_addr         (bmem_addr),            // Bootcode Memory address
+    .bmem_cen          (bmem_cen),             // Bootcode Memory chip enable (low active)
+    .bmem_din          (bmem_din),             // Bootcode Memory data input (optional)
+    .bmem_wen          (bmem_wen),             // Bootcode Memory write byte enable (low active) (optional)
     .puc_rst           (puc_rst),              // Main system reset
     .smclk             (smclk),                // ASIC ONLY: SMCLK
     .smclk_en          (smclk_en),             // FPGA ONLY: SMCLK enable
@@ -425,6 +477,7 @@ openMSP430 dut (
     .nmi               (nmi),                  // Non-maskable interrupt (asynchronous)
     .per_dout          (per_dout),             // Peripheral data output
     .pmem_dout         (pmem_dout),            // Program Memory data output
+    .bmem_dout         (bmem_dout),            // Bootcode Memory data output
     .reset_n           (reset_n),              // Reset Pin (low active, asynchronous)
     .scan_enable       (scan_enable),          // ASIC ONLY: Scan enable (active during scan shifting)
     .scan_mode         (scan_mode),            // ASIC ONLY: Scan mode
@@ -669,7 +722,6 @@ msp_debug msp_debug_0 (
     .puc_rst           (puc_rst)               // Main system reset
 );
 
-
 //
 // Generate Waveform
 //----------------------------------------
@@ -722,7 +774,7 @@ initial // Timeout
 initial // Normal end of test
   begin
      @(negedge stimulus_done);
-     wait(inst_pc=='hffff);
+     wait(inst_pc=='hffff || stimulus_kill);
 
      $display(" ===============================================");
      if ((dma_rd_error!=0) || (dma_wr_error!=0))
@@ -744,6 +796,8 @@ initial // Normal end of test
        begin
           $display("|               SIMULATION PASSED               |");
        end
+     if (stimulus_kill)
+          $display("|     (terminated by the verilog stimulus)      |");
      $display(" ===============================================");
      $display("");
      tb_extra_report;
@@ -765,6 +819,7 @@ initial // Normal end of test
 
    task tb_extra_report;
       begin
+      `ifndef __IPE_SIM
          $display("DMA REPORT: Total Accesses: %-d Total RD: %-d Total WR: %-d", dma_cnt_rd+dma_cnt_wr,     dma_cnt_rd,   dma_cnt_wr);
          $display("            Total Errors:   %-d Error RD: %-d Error WR: %-d", dma_rd_error+dma_wr_error, dma_rd_error, dma_wr_error);
          if (!((`PMEM_SIZE>=4092) && (`DMEM_SIZE>=1024)))
@@ -775,6 +830,7 @@ initial // Normal end of test
          $display("");
          $display("SIMULATION SEED: %d", `SEED);
          $display("");
+      `endif
       end
    endtask
 

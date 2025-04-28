@@ -37,10 +37,10 @@
 ###############################################################################
 #                            Parameter Check                                  #
 ###############################################################################
-EXPECTED_ARGS=7
+EXPECTED_ARGS=8
 if [ $# -ne $EXPECTED_ARGS ]; then
   echo "ERROR    : wrong number of arguments"
-  echo "USAGE    : asm2ihex.sh <test name> <test assembler file> <linker script> <assembler define>  <prog mem size> <data mem size> <peripheral addr space size>"
+  echo "USAGE    : asm2ihex.sh <test name> <test assembler file> <linker script> <assembler define>  <prog mem size> <data mem size> <peripheral addr space size> <bootcode mem size>"
   echo "Example  : asm2ihex.sh c-jump_jge  ../src/c-jump_jge.s43 ../bin/template.x ../bin/pmem.h 2048            128             512"
   exit 1
 fi
@@ -76,22 +76,32 @@ fi
 #               Generate the linker definition file                           #
 ###############################################################################
 
+BMEM_SIZE=$8
+BMEM_SIZE=$8
 PER_SIZE=$7
 DMEM_SIZE=$6
 PMEM_SIZE=$5
 PMEM_BASE=$((0x10000-$PMEM_SIZE))
 STACK_INIT=$((PER_SIZE+0x0080))
+BMEM_BASE=$((PER_SIZE+DMEM_SIZE))
+BMEM_IVT_BASE=$((BMEM_BASE+BMEM_SIZE-0x20))
 
 cp  $3  ./pmem.x
 cp  $4  ./pmem_defs.asm
 sed -ie "s/PMEM_BASE/$PMEM_BASE/g"         pmem.x
 sed -ie "s/PMEM_SIZE/$PMEM_SIZE/g"         pmem.x
+sed -ie "s/BMEM_BASE/$BMEM_BASE/g"         pmem.x
+sed -ie "s/BMEM_IVT_BASE/$BMEM_IVT_BASE/g"         pmem.x
+sed -ie "s/BMEM_SIZE/$BMEM_SIZE/g"         pmem.x
 sed -ie "s/DMEM_SIZE/$DMEM_SIZE/g"         pmem.x
+sed -ie "s/BMEM_SIZE/$BMEM_SIZE/g"         pmem.x
 sed -ie "s/PER_SIZE/$PER_SIZE/g"           pmem.x
 sed -ie "s/STACK_INIT/$STACK_INIT/g"       pmem.x
 
 sed -ie "s/PMEM_SIZE/$PMEM_SIZE/g"         pmem_defs.asm
 sed -ie "s/PER_SIZE_HEX/$PER_SIZE/g"       pmem_defs.asm
+sed -ie "s/BMEM_BASE_VAL/$BMEM_BASE/g" pmem_defs.asm
+sed -ie "s/BMEM_SIZE/$BMEM_SIZE/g"         pmem_defs.asm
 if [ $MSPGCC_PFX == "msp430-elf" ]; then
     sed -ie "s/PER_SIZE/.data/g"           pmem_defs.asm
     sed -ie "s/PMEM_BASE_VAL/.text/g"      pmem_defs.asm
@@ -106,13 +116,14 @@ fi
 ###############################################################################
 #                  Compile, link & generate IHEX file                         #
 ###############################################################################
+
 echo ""
 echo "\$ $MSPGCC_PFX-as      -alsm $2 -o $1.o > $1.l43"
 $MSPGCC_PFX-as      -alsm         $2     -o $1.o     > $1.l43
 echo "\$ $MSPGCC_PFX-objdump -xdsStr $1.o >> $1.l43"
 $MSPGCC_PFX-objdump -xdsStr       $1.o              >> $1.l43
 echo "\$ $MSPGCC_PFX-ld      -T ./pmem.x $1.o -o $1.elf"
-$MSPGCC_PFX-ld      -T ./pmem.x   $1.o   -o $1.elf
+$MSPGCC_PFX-ld      -T ./pmem.x   $1.o    -o $1.elf
 echo "\$ $MSPGCC_PFX-objcopy -O ihex $1.elf $1.ihex"
 $MSPGCC_PFX-objcopy -O ihex       $1.elf    $1.ihex
 echo ""

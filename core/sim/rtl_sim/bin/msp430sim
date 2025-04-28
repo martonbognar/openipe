@@ -90,7 +90,7 @@ fi
 asmfile=../src/$testname.s43;
 verfile=../src/$testname.v;
 incfile=../../../rtl/verilog/openMSP430_defines.v;
-linkfile=../bin/template.x;
+linkfile=../bin/ipe_linker.x;
 headfile=../bin/template_defs.asm;
 submitfile=../src/submit.f;
 if [ "$OMSP_SIMULATOR" == "isim" ]; then
@@ -179,11 +179,27 @@ source   pmem.sh
 
 # Compile assembler code
 echo "Compile, link & generate IHEX file (Program Memory: $pmemsize B, Data Memory: $dmemsize B, Peripheral Space: $persize B)..."
-../bin/asm2ihex.sh  pmem pmem.s43 $linkfile $headfile $pmemsize $dmemsize $persize
+../bin/asm2ihex.sh  pmem pmem.s43 $linkfile $headfile $pmemsize $dmemsize $persize $bmemsize
+
+# Compile bootcode firmware
+bootcode="../src/ipe/bootcode.s43"
+
+echo "Compile, link & generate bootcode IHEX file (Bootcode Memory: $bmemsize B)"
+echo ""
+echo "\$ $MSPGCC_PFX-as      -alsm $bootcode -o bootcode.o > bmem.l43"
+$MSPGCC_PFX-as      -alsm $bootcode -o bootcode.o    > bmem.l43
+echo "\$ $MSPGCC_PFX-ld      -T ./pmem.x bootcode.o -o bmem.elf"
+$MSPGCC_PFX-ld      -T ./pmem.x   bootcode.o    -o bmem.elf
+echo "\$ $MSPGCC_PFX-objcopy -O ihex bmem.elf bmem.ihex"
+$MSPGCC_PFX-objcopy -O ihex       bmem.elf    bmem.ihex
+echo ""
+bmem_offset=$(($persize+$dmemsize))
 
 # Generate Program memory file
-echo "Convert IHEX file to Verilog MEMH format..."
+echo "Convert IHEX files to Verilog MEMH format... (pmem size: $pmemsize, bmem size: $bmemsize, bmem offset $bmem_offset)"
 ../bin/ihex2mem.tcl -ihex pmem.ihex -out pmem.mem -mem_size $pmemsize
+../bin/ihex2mem.tcl -ihex bmem.ihex -out bmem.mem -mem_size $bmemsize -mem_offset $bmem_offset
+
 
 # Start verilog simulation
 echo "Start Verilog simulation..."

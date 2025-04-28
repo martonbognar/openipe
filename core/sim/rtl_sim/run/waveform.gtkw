@@ -1,0 +1,41 @@
+[*]
+[*] GTKWave Analyzer v3.3.104 (w)1999-2020 BSI
+[*] Mon May 27 07:04:23 2024
+[*]
+[dumpfile] "/home/marton/openipe-code/core/sim/rtl_sim/run/tb_openMSP430.vcd"
+[dumpfile_mtime] "Mon May 27 06:58:07 2024"
+[dumpfile_size] 20761209
+[savefile] "/home/marton/openipe-code/core/sim/rtl_sim/run/waveform.gtkw"
+[timestart] 3224000
+[size] 1920 1016
+[pos] -1 -1
+*-18.000000 8725000 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1
+[treeopen] tb_openMSP430.
+[treeopen] tb_openMSP430.dut.
+[treeopen] tb_openMSP430.dut.dbg_0.
+[treeopen] tb_openMSP430.dut.execution_unit_0.
+[sst_width] 295
+[signals_width] 323
+[sst_expanded] 1
+[sst_vpaned_height] 571
+@28
+tb_openMSP430.mclk
+@22
+tb_openMSP430.r0[15:0]
+@820
+tb_openMSP430.inst_full[255:0]
+tb_openMSP430.i_state[255:0]
+tb_openMSP430.e_state[255:0]
+@22
+tb_openMSP430.r1[15:0]
+@200
+-
+@28
+tb_openMSP430.dut.execution_unit_0.register_file_0.use_ipe_sp
+tb_openMSP430.bmem_0.ram_cen
+@22
+tb_openMSP430.bmem_0.ram_addr[8:0]
+@23
+tb_openMSP430.bmem_0.ram_dout[15:0]
+[pattern_trace] 1
+[pattern_trace] 0

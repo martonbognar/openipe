@@ -37,10 +37,10 @@
 
 `define VERY_LONG_TIMEOUT
 
-parameter TMPL8B_CNTRL1	 = 16'h0090; 
-parameter TMPL8B_CNTRL2	 = 16'h0091; 
-parameter TMPL8B_CNTRL3	 = 16'h0092; 
-parameter TMPL8B_CNTRL4	 = 16'h0093; 
+parameter TMPL8B_CNTRL1	 = 16'h0090;
+parameter TMPL8B_CNTRL2	 = 16'h0091;
+parameter TMPL8B_CNTRL3	 = 16'h0092;
+parameter TMPL8B_CNTRL4	 = 16'h0093;
 
 integer jj;
 integer inst_number_old;
@@ -51,6 +51,8 @@ initial
       $display(" ===============================================");
       $display("|                 START SIMULATION              |");
       $display(" ===============================================");
+
+    //   tb_skip_finish("|   (skipping this test as it does not pass on base openMSP430)   |");
 `ifdef DMA_IF_EN
       // Disable automatic DMA verification
       #10;
@@ -78,11 +80,11 @@ initial
                 $display("   HIGH Priority 8B DMA transfer tests");
 		$display("---------------------------------------\n");
 	     end
-	   
+
 	   // RD/WR ACCESS: Program memory (8b)
 	   //--------------------------------------------------------
 	   $display("MARCH-X: Program memory 8b:");
-	   
+
 	   // Wait random time until MARCH-X starts
 	   dma_rand_wait = $urandom_range(1,40);
 	   repeat(dma_rand_wait) @(posedge mclk);
@@ -94,7 +96,7 @@ initial
 	   inst_number_diff=inst_number-inst_number_old;
 	   if ( dma_priority & (inst_number_diff>2))   tb_error("CPU is not stopped in high priority mode");
 	   if (~dma_priority & (inst_number_diff<500)) tb_error("CPU is stopped in low priority mode");
-	     
+
 	   // RD/WR ACCESS: Data memory (8b)
 	   //--------------------------------------------------------
 	   $display("\n\nMARCH-X: Data memory 8b:");
@@ -110,7 +112,7 @@ initial
 	   inst_number_diff=inst_number-inst_number_old;
 	   if ( dma_priority & (inst_number_diff>2))   tb_error("CPU is not stopped in high priority mode");
 	   if (~dma_priority & (inst_number_diff<100)) tb_error("CPU is stopped in low priority mode");
-      
+
 	   // RD/WR ACCESS: Peripheral memory (8b)
 	   //--------------------------------------------------------
 	   $display("\n\nMARCH-X: Peripheral memory 8b ...");
@@ -126,7 +128,7 @@ initial
 	   if ( dma_priority & (inst_number_diff>2))   tb_error("CPU is not stopped in high priority mode");
 	   if (~dma_priority & (inst_number_diff<500)) tb_error("CPU is stopped in low priority mode");
 	end
-      
+
       // End of test
       //--------------------------------------------------
       $display("\n");
@@ -135,7 +137,7 @@ initial
 
       @(r15==16'h2000);
       if (r10 !== mem200) tb_error("Final Increment counter missmatch... firmware execution failed");
-      
+
       stimulus_done = 1;
 `else
        tb_skip_finish("|      (DMA interface support not included)    |");
@@ -151,24 +153,27 @@ initial
 integer mclk_cnt;
 always @(posedge mclk) mclk_cnt=mclk_cnt+1;
 
+reg [15:0] increment;
+
 // Check counter increment
 initial
   begin
      // Wait for firmware to start
      @(r15==16'h1000);
-     
+
      // Synchronize with first increment
      @(mem200); @(negedge mclk);
      mclk_cnt=0;
-     
+
      forever
        begin
 	  // When register R10 is incremented, make sure DMEM_200 = R10-1
 	  @(r10); @(negedge mclk);
-	  if (r10 !== (mem200+1))                                 tb_error("R10 Increment counter missmatch... firmware execution failed");
+	  increment = mem200 + 1;
+	  if (r10 !== increment)                                  tb_error("R10 Increment counter missmatch... firmware execution failed");
 	  if (~dma_priority & ((mclk_cnt < 4) | (mclk_cnt > 10))) tb_error("DMEM_200 -> R10 exec time error... firmware execution failed");
 	  mclk_cnt=0;
-	  
+
 	  // When DMEM_200 is incremented, make sure DMEM_200 = R10
 	  @(mem200); @(negedge mclk);
 	  if (r10 !== mem200)                                     tb_error("DMEM_200 Increment counter missmatch... firmware execution failed");
@@ -177,7 +182,7 @@ initial
        end
   end
 
-   
+
 //------------------------------------------------------
 // MARCH-X functions
 //------------------------------------------------------
@@ -185,7 +190,7 @@ task march_x_8b;
    input  [15:0] addr_start;
    input  [15:0] addr_end;
    input 	 verbose;
-   
+
    integer 	 ii;
    begin
       // MARCH X : down (w0); up (r0,w1); down (r1,w0); up (r0)
@@ -202,7 +207,7 @@ task march_x_8b;
 	   dma_read_8b(ii,  8'h00, 1'b0);
 	   dma_write_8b(ii, 8'hff, 1'b0);
 	end
-  
+
       if (verbose) $display("                                - down(r1,w0) ... ");
       for ( ii=addr_end; ii >= addr_start; ii=ii-1)
 	begin

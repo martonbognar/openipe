@@ -75,11 +75,30 @@ if [ "${OMSP_SIMULATOR:-iverilog}" = iverilog ]; then
     rm -rf simv
 
     NODUMP=${OMSP_NODUMP-0}
+    if [ -z "${__IPE_SIM}" ]; then
+      IPE_SIM_FLAG=''
+    else
+      IPE_SIM_FLAG='-D__IPE_SIM'
+    fi
+
+    EXTRA_IPE_FLAG=''
+    if [ -n "${__OMIT_IPE_FIXES}" ]; then
+      EXTRA_IPE_FLAG+='-DOMIT_IPE_FIXES '
+    fi
+    if [ -n "${__OMIT_SP_SWITCHING}" ]; then
+      EXTRA_IPE_FLAG+='-DOMIT_SP_SWITCHING '
+    fi
+    if [ -n "${__IPE_IRQ_SW}" ]; then
+      EXTRA_IPE_FLAG+='-DSECURE_IRQ_SW '
+    fi
+    if [ -n "${__IPE_IRQ_FW}" ]; then
+      EXTRA_IPE_FLAG+='-DSECURE_IRQ_FW '
+    fi
     if [ $NODUMP -eq 1 ]
       then
-        iverilog -o simv -c $3 -D SEED=$4 -D $5 -D NODUMP
+        iverilog -o simv -c $3 -D SEED=$4 -D $5 -D NODUMP ${IPE_SIM_FLAG} ${EXTRA_IPE_FLAG}
       else
-        iverilog -o simv -c $3 -D SEED=$4 -D $5
+        iverilog -o simv -c $3 -D SEED=$4 -D $5 ${IPE_SIM_FLAG} ${EXTRA_IPE_FLAG}
     fi
 
     if [[ $(uname -s) == CYGWIN* ]];

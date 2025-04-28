@@ -1,0 +1,4 @@
+pycparser==2.20
+pycparserext==2021.1
+pyelftools==0.29
+Jinja2==3.1.4

@@ -1,0 +1,164 @@
+.include "pmem_defs.asm"
+
+.set __IPE_CUSTOM_IVT, 1
+.include "../src-c/framework/libipe/stubs/ipe-protected-irq.s"
+
+    .global main
+    .sect .data
+stack:
+    .word 0, 0, 0, 0
+    .space 100
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Main test harness, unprotected code
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+    .sect .text
+main:
+    mov #stack+50, r1
+
+    mov #__ipe_start_shift, &MPUIPSEGB1
+    mov #__ipe_end_shift, &MPUIPSEGB2
+    mov #0x0060, &MPUIPC0
+
+    ; call enclave once to set up stack pointer (which causes a difference in execution time)
+    call #ipe_entry
+
+    ; set up interrupt to hit the single-cycle nops
+    eint
+    mov #0x4, &TACTL
+    mov #0x2A, &TACCR0
+    mov #0x216, &TACTL
+
+    mov #0xcafe, r15  ; signal start
+    mov #0, r7
+    call #ipe_entry
+    mov #0xdead, r15  ; signal end
+
+    ; set up interrupt to hit the seven-cycle instructions
+    eint
+    mov #0x4, &TACTL
+    mov #0x2A, &TACCR0  ; we subtract two because the SP is already set up
+    mov #0x216, &TACTL
+
+    mov #0xcafe, r15  ; signal
+    mov #0, r7
+    call #ipe_entry
+    mov #0xdead, r15  ; signal end
+
+end_of_test:
+    nop
+    br #0xffff
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; IPE configuration struct (left empty)
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+    .sect .ipestruct, "a"
+.word 1, 2, 3, 4
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; IPE single entry point dispatch table
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+    .global ecall_table
+    .global max_ecall_index
+    .sect ".ipe_const", "a"
+    .align 2
+ecall_table:
+    .word main_ipe_fn
+    .word 0
+
+max_ecall_index:
+    .word 0
+
+ipe_var:
+    .word 0
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; IPE main function
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+    .sect .ipe_func, "a"
+main_ipe_fn:
+    add #1, &ipe_var
+    cmp #2, &ipe_var
+    jz 1f
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    jmp 2f
+1:
+    mov &ipe_var, &ipe_var
+    jmp 2f
+2:
+    ret
+
+
+    .sect .ipe_padding, "a"
+padding:
+    .word 0
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; TIMER_A handler in untrusted code
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+    .section .text
+    .global untrusted_isr
+
+untrusted_isr:
+    mov #0, &TACTL
+    mov #0xbeef, r15  ; signal ISR
+    nop
+    reti
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; IPE interrupt vector table
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+    .global __irq_trampoline
+    .section .ipe_vectors, "a"
+.word ipe_irq_trampoline_0  ; Interrupt  0 (lowest priority)    <unused>
+.word ipe_irq_trampoline_1  ; Interrupt  1                      <unused>
+.word ipe_irq_trampoline_2  ; Interrupt  2                      <unused>
+.word ipe_irq_trampoline_3  ; Interrupt  3                      <unused>
+.word ipe_irq_trampoline_4  ; Interrupt  4                      <unused>
+.word ipe_irq_trampoline_5  ; Interrupt  5                      <unused>
+.word ipe_irq_trampoline_6  ; Interrupt  6                      <unused>
+.word ipe_irq_trampoline_7  ; Interrupt  7                      <unused>
+.word __irq_trampoline  ; Interrupt  8                      <unused>
+.word ipe_irq_trampoline_9  ; Interrupt  9                      <unused>
+.word ipe_irq_trampoline_10   ; Interrupt 10                      Watchdog timer
+.word ipe_irq_trampoline_11 ; Interrupt 11                      <unused>
+.word ipe_irq_trampoline_12 ; Interrupt 12                      <unused>
+.word ipe_irq_trampoline_13 ; Interrupt 13                      <unused>
+.word ipe_irq_trampoline_14 ; Interrupt 14                      NMI
+.word ipe_irq_trampoline_15 ; Interrupt 15 (highest priority)   RESET
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Unprotected interrupt vector table
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+.section .vectors, "a"
+.word end_of_test    ; Interrupt  0 (lowest priority)    <unused>
+.word end_of_test    ; Interrupt  1                      <unused>
+.word end_of_test    ; Interrupt  2                      <unused>
+.word end_of_test    ; Interrupt  3                      <unused>
+.word end_of_test    ; Interrupt  4                      <unused>
+.word end_of_test    ; Interrupt  5                      <unused>
+.word end_of_test    ; Interrupt  6                      <unused>
+.word end_of_test    ; Interrupt  7                      <unused>
+.word untrusted_isr  ; Interrupt  8                      <unused>
+.word end_of_test    ; Interrupt  9                      <unused>
+.word end_of_test    ; Interrupt 10                      Watchdog timer
+.word end_of_test    ; Interrupt 11                      <unused>
+.word end_of_test    ; Interrupt 12                      <unused>
+.word end_of_test    ; Interrupt 13                      <unused>
+.word end_of_test    ; Interrupt 14                      NMI
+.word main           ; Interrupt 15 (highest priority)   RESET

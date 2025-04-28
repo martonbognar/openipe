@@ -60,6 +60,11 @@ module  omsp_register_file (
     status,                       // R2 Status {V,N,Z,C}
 
 // INPUTs
+`ifndef OMIT_SP_SWITCHING
+    ipe_exec,
+    bootcode_exec,
+    irq_detect,
+`endif
     alu_stat,                     // ALU Status {V,N,Z,C}
     alu_stat_wr,                  // ALU Status write {V,N,Z,C}
     inst_bw,                      // Decoded Inst: byte width
@@ -94,6 +99,11 @@ output        [3:0] status;       // R2 Status {V,N,Z,C}
 
 // INPUTs
 //=========
+`ifndef OMIT_SP_SWITCHING
+input               ipe_exec;
+input               irq_detect;
+input               bootcode_exec;
+`endif
 input         [3:0] alu_stat;     // ALU Status {V,N,Z,C}
 input         [3:0] alu_stat_wr;  // ALU Status write {V,N,Z,C}
 input               inst_bw;      // Decoded Inst: byte width
@@ -159,18 +169,41 @@ wire       UNUSED_scan_enable = scan_enable;
 wire       mclk_r1            = mclk;
 `endif
 
-always @(posedge mclk_r1 or posedge puc_rst)
-  if (puc_rst)        r1 <= 16'h0000;
-  else if (r1_wr)     r1 <= reg_dest_val_in & 16'hfffe;
-  else if (reg_sp_wr) r1 <= reg_sp_val      & 16'hfffe;
-`ifdef CLOCK_GATING
-  else                r1 <= reg_incr_val    & 16'hfffe;
-`else
-  else if (r1_inc)    r1 <= reg_incr_val    & 16'hfffe;
+`ifndef OMIT_SP_SWITCHING
+  reg [15:0] r1_ipe;
+
+  reg ipe_exec_irq;
+  always @(posedge mclk or posedge puc_rst)
+    if (puc_rst) ipe_exec_irq <= 0;
+    else if (irq_detect) ipe_exec_irq <= ipe_exec;
+
+  wire use_ipe_sp = ipe_exec | (bootcode_exec & ipe_exec_irq);
 `endif
 
-wire UNUSED_reg_sp_val_0  = reg_sp_val[0];
+// Switching between IPE and untrusted stack pointer
+wire [15:0] r1_nxt = r1_wr     ? reg_dest_val_in & 16'hfffe :
+	             reg_sp_wr ? reg_sp_val      & 16'hfffe :
+		     r1_inc    ? reg_incr_val    & 16'hfffe :
+`ifndef OMIT_SP_SWITCHING
+		     use_ipe_sp  ? r1_ipe :
+`endif
+         r1;
 
+always @(posedge mclk or posedge puc_rst)
+  if (puc_rst) begin
+      r1 <= 16'h0000;
+`ifndef OMIT_SP_SWITCHING
+      r1_ipe <= 16'h0000;
+`endif
+  end
+`ifndef OMIT_SP_SWITCHING
+  else if (use_ipe_sp)
+      r1_ipe <= r1_nxt;
+`endif
+  else
+      r1 <= r1_nxt;
+
+wire UNUSED_reg_sp_val_0  = reg_sp_val[0];
 
 // R2: Status register
 //---------------------
@@ -579,7 +612,12 @@ always @(posedge mclk_r15 or posedge puc_rst)
 //=============================================================================
 
 assign reg_src  = (r0      & {16{inst_src_in[0]}})   |
+`ifndef OMIT_SP_SWITCHING
+                  (r1      & {16{inst_src_in[1]}} & {16{!use_ipe_sp}}) |
+                  (r1_ipe  & {16{inst_src_in[1]}} & {16{use_ipe_sp}})  |
+`else
                   (r1      & {16{inst_src_in[1]}})   |
+`endif
                   (r2      & {16{inst_src_in[2]}})   |
                   (r3      & {16{inst_src_in[3]}})   |
                   (r4      & {16{inst_src_in[4]}})   |
@@ -596,7 +634,12 @@ assign reg_src  = (r0      & {16{inst_src_in[0]}})   |
                   (r15     & {16{inst_src_in[15]}});
 
 assign reg_dest = (r0      & {16{inst_dest[0]}})  |
+`ifndef OMIT_SP_SWITCHING
+                  (r1      & {16{inst_dest[1]}} & {16{!use_ipe_sp}}) |
+                  (r1_ipe  & {16{inst_dest[1]}} & {16{use_ipe_sp}})  |
+`else
                   (r1      & {16{inst_dest[1]}})  |
+`endif
                   (r2      & {16{inst_dest[2]}})  |
                   (r3      & {16{inst_dest[3]}})  |
                   (r4      & {16{inst_dest[4]}})  |

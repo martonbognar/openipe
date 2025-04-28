@@ -1,0 +1,241 @@
+; Test case scenario:
+;
+; WDT is handled by a secure ISR in the IPE region, Timer A is handled by an untrusted ISR.
+;
+; To test, we trigger both interrupts from a secure and an insecure execution context.
+;
+; Expected timeline:
+; 1. Timer A interrupt while executing unprotected code -> handled in unprotected code, no context switch
+; 2. WDT interrupt while executing unprotected code -> handled by an IPE ISR, accessed through a trampoline function (~ecall?)
+; 3. WDT interrupt while executing IPE code -> handled by an IPE ISR, no context switch
+; 4. Timer A interrupt while executing IPE code -> handled by an untrusted ISR, accessed through a trampoline function (~ocall?)
+
+.include "pmem_defs.asm"
+
+.set __IPE_CUSTOM_IVT, 1
+.include "../src-c/framework/libipe/stubs/ipe-protected-irq.s"
+
+    .global main
+    .sect .data
+stack:
+    .word 0, 0, 0, 0
+    .space 100
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Main test harness, unprotected code
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+    .sect .text
+main:
+    mov #stack+50, r1
+
+    mov #__ipe_start_shift, &MPUIPSEGB1
+    mov #__ipe_end_shift, &MPUIPSEGB2
+    mov #0x0060, &MPUIPC0
+
+    bis.b #0x01, &IE1 ; enable watchdog interrupts
+    mov #0x5a3b, &WDTCTL ; configure watchdog
+
+    eint
+    mov #0x4, &TACTL
+    mov #0x9, &TACCR0
+    mov #0x216, &TACTL
+
+    mov #0xcafe, r12
+
+    ; delaying the start of the enclave for the WDT to interrupt before jumping to IPE code
+    mov &stack, &stack
+    mov &stack, &stack
+    mov &stack, &stack
+    mov &stack, &stack
+    mov &stack, &stack
+    mov &stack, &stack
+    mov &stack, &stack
+    mov &stack, &stack
+    mov &stack, &stack
+    mov &stack, &stack
+    nop
+    nop
+
+    mov #0, r7
+    call #ipe_entry
+
+end_of_test:
+    nop
+    br #0xffff
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; TIMER_A handler in untrusted code
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+untrusted_timera_handler:
+    mov #0, &TACTL
+    nop
+    reti
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Trampoline code to IPE in untrusted code
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+irq_id_in_unp:
+    .word 0
+
+trampoline_to_ipe:
+    ; get interrupt identifier (by jumping to different parts of this sequence)
+    inc &irq_id_in_unp
+    inc &irq_id_in_unp
+    inc &irq_id_in_unp
+    inc &irq_id_in_unp
+    inc &irq_id_in_unp
+trampoline_to_ipe_10:
+    inc &irq_id_in_unp
+    inc &irq_id_in_unp
+    inc &irq_id_in_unp
+    inc &irq_id_in_unp
+    inc &irq_id_in_unp
+    inc &irq_id_in_unp
+    inc &irq_id_in_unp
+    inc &irq_id_in_unp
+    inc &irq_id_in_unp
+    inc &irq_id_in_unp
+trampoline_to_ipe_0:
+
+    ; back up registers on the unprotected stack
+    push r4
+    push r5
+    push r6
+    push r7
+    push r8
+    push r9
+    push r10
+    push r11
+    push r12
+    push r13
+    push r14
+    push r15
+
+    mov #-1, r7
+    mov &irq_id_in_unp, r8  ; identifier of ISR in r8
+    clr &irq_id_in_unp
+    call #ipe_entry
+
+    ; trusted ISR will return to untrusted trampoline to execute `reti`, which
+    ; will return here because of the "fake" stack entries
+untrusted_cont:
+    pop r15
+    pop r14
+    pop r13
+    pop r12
+    pop r11
+    pop r10
+    pop r9
+    pop r8
+    pop r7
+    pop r6
+    pop r5
+    pop r4
+
+    ; return to originally interrupted instruction
+    reti
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; IPE configuration struct (left empty)
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+    .sect .ipestruct, "a"
+.word 1, 2, 3, 4
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; IPE single entry point dispatch table
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+    .global ecall_table
+    .global max_ecall_index
+    .sect ".ipe_const", "a"
+    .align 2
+ecall_table:
+    .word main_ipe_fn
+    .word 0
+
+max_ecall_index:
+    .word 0
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; IPE main function
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+    .sect .ipe_func, "a"
+main_ipe_fn:
+    mov #0x4, &TACTL
+    mov #0x9, &TACCR0
+    mov #0x216, &TACTL
+
+    mov #0x5a3b, &WDTCTL ; configure watchdog
+    bis.b #0x01, &IE1 ; enable watchdog interrupts
+    eint
+
+    ; delaying the start of the enclave for the WDT to interrupt at the right time
+.rept 8
+    mov &stack, &stack
+.endr
+    nop
+    nop
+
+    ret
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; IPE ISR for watchdog interrupts
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+    .sect .ipe:_isr
+trusted_wdt_handler:
+    dint
+    bic.b #0x01, &IE1
+    mov #0x5a88, &WDTCTL
+    nop
+    reti
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; IPE interrupt vector table
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+.section .ipe_vectors, "a"
+.word ipe_irq_trampoline_0  ; Interrupt  0 (lowest priority)    <unused>
+.word ipe_irq_trampoline_1  ; Interrupt  1                      <unused>
+.word ipe_irq_trampoline_2  ; Interrupt  2                      <unused>
+.word ipe_irq_trampoline_3  ; Interrupt  3                      <unused>
+.word ipe_irq_trampoline_4  ; Interrupt  4                      <unused>
+.word ipe_irq_trampoline_5  ; Interrupt  5                      <unused>
+.word ipe_irq_trampoline_6  ; Interrupt  6                      <unused>
+.word ipe_irq_trampoline_7  ; Interrupt  7                      <unused>
+.word ipe_irq_trampoline_8  ; Interrupt  8                      <unused>
+.word ipe_irq_trampoline_9  ; Interrupt  9                      <unused>
+.word trusted_wdt_handler   ; Interrupt 10                      Watchdog timer
+.word ipe_irq_trampoline_11 ; Interrupt 11                      <unused>
+.word ipe_irq_trampoline_12 ; Interrupt 12                      <unused>
+.word ipe_irq_trampoline_13 ; Interrupt 13                      <unused>
+.word ipe_irq_trampoline_14 ; Interrupt 14                      NMI
+.word ipe_irq_trampoline_15 ; Interrupt 15 (highest priority)   RESET
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Unprotected interrupt vector table
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+.section .vectors, "a"
+.word end_of_test    ; Interrupt  0 (lowest priority)    <unused>
+.word end_of_test    ; Interrupt  1                      <unused>
+.word end_of_test    ; Interrupt  2                      <unused>
+.word end_of_test    ; Interrupt  3                      <unused>
+.word end_of_test    ; Interrupt  4                      <unused>
+.word end_of_test    ; Interrupt  5                      <unused>
+.word end_of_test    ; Interrupt  6                      <unused>
+.word end_of_test    ; Interrupt  7                      <unused>
+.word untrusted_timera_handler    ; Interrupt  8                      <unused>
+.word end_of_test    ; Interrupt  9                      <unused>
+.word trampoline_to_ipe_10    ; Interrupt 10                      Watchdog timer
+.word end_of_test    ; Interrupt 11                      <unused>
+.word end_of_test    ; Interrupt 12                      <unused>
+.word end_of_test    ; Interrupt 13                      <unused>
+.word end_of_test    ; Interrupt 14                      NMI
+.word main           ; Interrupt 15 (highest priority)   RESET

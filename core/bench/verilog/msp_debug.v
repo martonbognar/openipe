@@ -138,6 +138,7 @@ always @(i_state_bin)
       3'h3    : i_state =  "EXT1";
       3'h4    : i_state =  "EXT2";
       3'h5    : i_state =  "IDLE";
+      3'h6    : i_state =  "I_BOOTCODE";
       default : i_state =  "XXXXX";
     endcase
    
@@ -163,6 +164,7 @@ always @(e_state_bin)
       4'hB    : e_state =  "EXEC";
       4'hC    : e_state =  "JUMP";
       4'hD    : e_state =  "IDLE";
+      4'hF    : e_state =  "DST_WD";
       default : e_state =  "xxxx";
     endcase
 

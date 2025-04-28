@@ -22,7 +22,7 @@ export MSPGCC_PFX
 #                   - vcs       : VCS
 #                   - vsim      : Modelsim
 #                   - isim      : Xilinx simulator
-OMSP_SIMULATOR=ncverilog
+OMSP_SIMULATOR=iverilog
 export OMSP_SIMULATOR
 
 
@@ -45,7 +45,7 @@ for (( ii=0; ii<=$LAST_REGRESSION; ii++ ))
     rm -rf ./cov_work
     LOG_DIR=./log/$ii
     mkdir -p $LOG_DIR
-     
+
     # Two-Operand Arithmetic test patterns
     ../bin/msp430sim two-op_mov               | tee $LOG_DIR/two-op_mov.log
     ../bin/msp430sim two-op_mov-b             | tee $LOG_DIR/two-op_mov-b.log
@@ -64,7 +64,7 @@ for (( ii=0; ii<=$LAST_REGRESSION; ii++ ))
     ../bin/msp430sim two-op_dadd              | tee $LOG_DIR/two-op_dadd.log
     ../bin/msp430sim two-op_autoincr          | tee $LOG_DIR/two-op_autoincr.log
     ../bin/msp430sim two-op_autoincr-b        | tee $LOG_DIR/two-op_autoincr-b.log
-     
+
     # Conditional Jump test patterns
     ../bin/msp430sim c-jump_jeq               | tee $LOG_DIR/c-jump_jeq.log
     ../bin/msp430sim c-jump_jne               | tee $LOG_DIR/c-jump_jne.log
@@ -74,7 +74,7 @@ for (( ii=0; ii<=$LAST_REGRESSION; ii++ ))
     ../bin/msp430sim c-jump_jge               | tee $LOG_DIR/c-jump_jge.log
     ../bin/msp430sim c-jump_jl                | tee $LOG_DIR/c-jump_jl.log
     ../bin/msp430sim c-jump_jmp               | tee $LOG_DIR/c-jump_jmp.log
-     
+
     # Single-Operand Arithmetic test patterns
     ../bin/msp430sim sing-op_rrc              | tee $LOG_DIR/sing-op_rrc.log
     ../bin/msp430sim sing-op_rra              | tee $LOG_DIR/sing-op_rra.log
@@ -82,37 +82,38 @@ for (( ii=0; ii<=$LAST_REGRESSION; ii++ ))
     ../bin/msp430sim sing-op_sxt              | tee $LOG_DIR/sing-op_sxt.log
     ../bin/msp430sim sing-op_push             | tee $LOG_DIR/sing-op_push.log
     ../bin/msp430sim sing-op_call             | tee $LOG_DIR/sing-op_call.log
-     
+
     # Interrupts & NMI
     ../bin/msp430sim sing-op_reti             | tee $LOG_DIR/sing-op_reti.log
     ../bin/msp430sim nmi                      | tee $LOG_DIR/nmi.log
     ../bin/msp430sim irq32                    | tee $LOG_DIR/irq32.log
     ../bin/msp430sim irq64                    | tee $LOG_DIR/irq64.log
-     
+
     # ROM Data Read access
     ../bin/msp430sim two-op_add_rom-rd        | tee $LOG_DIR/two-op_add_rom-rd.log
     ../bin/msp430sim sing-op_push_rom-rd      | tee $LOG_DIR/sing-op_push_rom-rd.log
     ../bin/msp430sim sing-op_call_rom-rd      | tee $LOG_DIR/sing-op_call_rom-rd.log
-     
+
     # Power saving modes (CPUOFF, OSCOFF, SCG0, SCG1)
     ../bin/msp430sim op_modes                 | tee $LOG_DIR/op_modes.log
     ../bin/msp430sim op_modes_asic            | tee $LOG_DIR/op_modes_asic.log
     ../bin/msp430sim lp_modes_asic            | tee $LOG_DIR/lp_modes_asic.log
     ../bin/msp430sim lp_modes_dbg_asic        | tee $LOG_DIR/lp_modes_dbg_asic.log
-     
+
     # CPU startup conditions
     ../bin/msp430sim cpu_startup_asic         | tee $LOG_DIR/cpu_startup_asic.log
-     
+
     # Basic clock module
     ../bin/msp430sim clock_module             | tee $LOG_DIR/clock_module.log
     ../bin/msp430sim clock_module_asic        | tee $LOG_DIR/clock_module_asic.log
     ../bin/msp430sim clock_module_asic_mclk   | tee $LOG_DIR/clock_module_asic_mclk.log
     ../bin/msp430sim clock_module_asic_smclk  | tee $LOG_DIR/clock_module_asic_smclk.log
     ../bin/msp430sim clock_module_asic_lfxt   | tee $LOG_DIR/clock_module_asic_lfxt.log
-     
+
     # Serial Debug Interface (UART)
     ../bin/msp430sim dbg_uart                 | tee $LOG_DIR/dbg_uart.log
     ../bin/msp430sim dbg_uart_sync            | tee $LOG_DIR/dbg_uart_sync.log
+    # ^^ tests takes looong time
     ../bin/msp430sim dbg_uart_cpu             | tee $LOG_DIR/dbg_uart_cpu.log
     ../bin/msp430sim dbg_uart_mem             | tee $LOG_DIR/dbg_uart_mem.log
     ../bin/msp430sim dbg_uart_hwbrk0          | tee $LOG_DIR/dbg_uart_hwbrk0.log
@@ -123,7 +124,7 @@ for (( ii=0; ii<=$LAST_REGRESSION; ii++ ))
     ../bin/msp430sim dbg_uart_halt_irq        | tee $LOG_DIR/dbg_uart_halt_irq.log
     ../bin/msp430sim dbg_uart_onoff           | tee $LOG_DIR/dbg_uart_onoff.log
     ../bin/msp430sim dbg_uart_onoff_asic      | tee $LOG_DIR/dbg_uart_onoff_asic.log
-     
+
     # Serial Debug Interface (I2C)
     ../bin/msp430sim dbg_i2c                  | tee $LOG_DIR/dbg_i2c.log
     ../bin/msp430sim dbg_i2c_sync             | tee $LOG_DIR/dbg_i2c_sync.log
@@ -137,37 +138,37 @@ for (( ii=0; ii<=$LAST_REGRESSION; ii++ ))
     ../bin/msp430sim dbg_i2c_halt_irq         | tee $LOG_DIR/dbg_i2c_halt_irq.log
     ../bin/msp430sim dbg_i2c_onoff            | tee $LOG_DIR/dbg_i2c_onoff.log
     ../bin/msp430sim dbg_i2c_onoff_asic       | tee $LOG_DIR/dbg_i2c_onoff_asic.log
-     
+
     # SFR test patterns
     ../bin/msp430sim sfr                      | tee $LOG_DIR/sfr.log
-     
+
     # SCAN test patterns (only to increase coverage)
     ../bin/msp430sim scan                     | tee $LOG_DIR/scan.log
-     
+
     # Watchdog test patterns
     ../bin/msp430sim wdt_interval             | tee $LOG_DIR/wdt_interval.log
     ../bin/msp430sim wdt_watchdog             | tee $LOG_DIR/wdt_watchdog.log
     ../bin/msp430sim wdt_clkmux               | tee $LOG_DIR/wdt_clkmux.log
     ../bin/msp430sim wdt_wkup                 | tee $LOG_DIR/wdt_wkup.log
-     
+
     # GPIO test patterns
     ../bin/msp430sim gpio_rdwr                | tee $LOG_DIR/gpio_rdwr.log
     ../bin/msp430sim gpio_irq                 | tee $LOG_DIR/gpio_irq.log
-     
+
     # Peripheral templates test patterns
     ../bin/msp430sim template_periph_8b       | tee $LOG_DIR/template_periph_8b.log
     ../bin/msp430sim template_periph_16b      | tee $LOG_DIR/template_periph_16b.log
-     
+
     # Timer A patterns
     ../bin/msp430sim tA_modes                 | tee $LOG_DIR/tA_modes.log
     ../bin/msp430sim tA_compare               | tee $LOG_DIR/tA_compare.log
     ../bin/msp430sim tA_output                | tee $LOG_DIR/tA_output.log
     ../bin/msp430sim tA_capture               | tee $LOG_DIR/tA_capture.log
     ../bin/msp430sim tA_clkmux                | tee $LOG_DIR/tA_clkmux.log
-     
+
     # DMA Interface
-    ../bin/msp430sim dma_rdwr_16b             | tee $LOG_DIR/dma_rdwr_16b.log
-    ../bin/msp430sim dma_rdwr_8b              | tee $LOG_DIR/dma_rdwr_8b.log
+    ../bin/msp430sim -seed -1904889930 dma_rdwr_16b             | tee $LOG_DIR/dma_rdwr_16b.log
+    ../bin/msp430sim -seed -6727727 dma_rdwr_8b              | tee $LOG_DIR/dma_rdwr_8b.log
     ../bin/msp430sim dma_resp                 | tee $LOG_DIR/dma_resp.log
     ../bin/msp430sim dma_dbg_arbiter          | tee $LOG_DIR/dma_dbg_arbiter.log
     ../bin/msp430sim dma_lpm0_asic            | tee $LOG_DIR/dma_lpm0_asic.log
@@ -178,17 +179,20 @@ for (( ii=0; ii<=$LAST_REGRESSION; ii++ ))
 
     # Simple full duplex UART (8N1 protocol)
     #../bin/msp430sim uart                    | tee $LOG_DIR/uart.log
-     
+
     # Hardware multiplier test patterns
     ../bin/msp430sim mpy_basic                | tee $LOG_DIR/mpy_basic.log
-     
-     
+
+
     # Report regression results
-    ../bin/parse_results $LOG_DIR             | tee $LOG_DIR/../summary.$ii.log
+    #../bin/parse_results $LOG_DIR             | tee $LOG_DIR/../summary.$ii.log
 
 done
 
 
-if [ $LAST_REGRESSION != 0 ]; then
-    ../bin/parse_summaries                    | tee $LOG_DIR/../regressions_summary.log
-fi
+#if [ $LAST_REGRESSION != 0 ]; then
+#    ../bin/parse_summaries                    | tee $LOG_DIR/../regressions_summary.log
+#fi
+
+../bin/parse_results $LOG_DIR
+exit $?

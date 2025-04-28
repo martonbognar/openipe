@@ -1,0 +1,64 @@
+; If the IPE configuration lock bit is not set, the protection boundaries can
+; be changed during code execution, leading to updated values in the
+; configuration registers.
+
+.include "pmem_defs.asm"
+
+    .sect .data, "a"
+secret:
+    ; data memory is initialized to zero by the HW on startup
+    .word 0x0
+
+    .global main
+    .sect .text
+custom_struct:
+    .word 0x0060, 0x0110, 0x0100, 0xFF8F
+
+main:
+    mov &secret, r15
+    mov &secret2, r14
+    mov #0xcafe, r12 ;; checkpoint 1
+    ;; NOTE: first change lower boundary and then upper, otherwise the whole
+    ;; memory is protected in between and any DMA accesses will fail..
+    mov #0x800, &MPUIPSEGB1 ;; attempt to change boundaries
+    mov #0x840, &MPUIPSEGB2 ;; attempt to change boundaries
+    mov &secret, r15
+    mov &secret2, r14
+    mov #0xbeef, r12 ;; checkpoint 2
+
+        /* ----------------------         END OF TEST        --------------- */
+end_of_test:
+    nop
+    br #0xffff
+
+    .sect .ipe_seg, "a"
+secret2:
+    .word 43
+
+        /* ----------------------        IPE METADATA        --------------- */
+
+.section .ipe_meta, "a"
+ipe_flag:
+    .word 0xAAAA
+ipe_struct:
+    .word custom_struct
+
+        /* ----------------------         INTERRUPT VECTORS  --------------- */
+
+.section .vectors, "a"
+.word end_of_test    ; Interrupt  0 (lowest priority)    <unused>
+.word end_of_test    ; Interrupt  1                      <unused>
+.word end_of_test    ; Interrupt  2                      <unused>
+.word end_of_test    ; Interrupt  3                      <unused>
+.word end_of_test    ; Interrupt  4                      <unused>
+.word end_of_test    ; Interrupt  5                      <unused>
+.word end_of_test    ; Interrupt  6                      <unused>
+.word end_of_test    ; Interrupt  7                      <unused>
+.word end_of_test    ; Interrupt  8                      <unused>
+.word end_of_test    ; Interrupt  9                      <unused>
+.word end_of_test    ; Interrupt 10                      Watchdog timer
+.word end_of_test    ; Interrupt 11                      <unused>
+.word end_of_test    ; Interrupt 12                      <unused>
+.word end_of_test    ; Interrupt 13                      <unused>
+.word end_of_test    ; Interrupt 14                      NMI
+.word main           ; Interrupt 15 (highest priority)   RESET

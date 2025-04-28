@@ -62,6 +62,11 @@ module  omsp_execution_unit (
     scg1,                          // System clock generator 1. Turns off the SMCLK
 
 // INPUTs
+`ifndef OMIT_SP_SWITCHING
+    ipe_exec,
+    irq_detect,
+    bootcode_exec,
+`endif
     dbg_halt_st,                   // Halt/Run status from CPU
     dbg_mem_dout,                  // Debug unit data output
     dbg_reg_wr,                    // Debug unit CPU register write
@@ -105,6 +110,11 @@ output              scg1;          // System clock generator 1. Turns off the SM
 
 // INPUTs
 //=========
+`ifndef OMIT_SP_SWITCHING
+input               ipe_exec;
+input		    irq_detect;
+input               bootcode_exec;
+`endif
 input               dbg_halt_st;   // Halt/Run status from CPU
 input        [15:0] dbg_mem_dout;  // Debug unit data output
 input               dbg_reg_wr;    // Debug unit CPU register write
@@ -191,6 +201,11 @@ omsp_register_file register_file_0 (
     .status       (status),       // R2 Status {V,N,Z,C}
 
 // INPUTs
+`ifndef OMIT_SP_SWITCHING
+    .ipe_exec     (ipe_exec),
+    .irq_detect (irq_detect),
+    .bootcode_exec(bootcode_exec),
+`endif
     .alu_stat     (alu_stat),     // ALU Status {V,N,Z,C}
     .alu_stat_wr  (alu_stat_wr),  // ALU Status write {V,N,Z,C}
     .inst_bw      (inst_bw),      // Decoded Inst: byte width

@@ -22,9 +22,9 @@
 # Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
 #
 #------------------------------------------------------------------------------
-# 
+#
 # File Name: ihex2mem.tcl
-# 
+#
 # Author(s):
 #             - Olivier Girard,    olgirard@gmail.com
 #
@@ -38,10 +38,10 @@
 #                            PARAMETER CHECK                                  #
 ###############################################################################
 
-if {$argc != 6} {
+if {! ($argc == 6 || $argc == 8) } {
   puts "ERROR   : wrong number of arguments"
-  puts "USAGE   : ihex2mem.tcl -ihex <input file> -out <output file> -mem_size <memory size>"
-  puts "Example : ihex2mem.tcl -ihex rom.ihex     -out rom.mem       -mem_size 2048"
+  puts "USAGE   : ihex2mem.tcl -ihex <input file> -out <output file> -mem_size <memory size> (-mem_offset <start address>)"
+  puts "Example : ihex2mem.tcl -ihex rom.ihex     -out rom.mem   -mem_size 2048 "
   exit 1
 }
 
@@ -49,6 +49,7 @@ if {$argc != 6} {
 set ihex      empty.in
 set out       empty.out
 set mem_size  -1
+set mem_offset -1
 
 # parse arguments
 for {set i 0} {$i < $argc} {incr i} {
@@ -56,21 +57,32 @@ for {set i 0} {$i < $argc} {incr i} {
 	-ihex     {set ihex     [lindex $argv [expr $i+1]]; incr i}
 	-out      {set out      [lindex $argv [expr $i+1]]; incr i}
 	-mem_size {set mem_size [lindex $argv [expr $i+1]]; incr i}
+	-mem_offset {set mem_offset [lindex $argv [expr $i+1]]; incr i}
     }
+}
+set tmp_addr $mem_offset
+if {$tmp_addr == -1} {
+    set tmp_addr 0
 }
 
 # Make sure arugments were specified
 if {[string eq $ihex empty.in]} {
     puts "IHEX input file isn't specified"
-    exit 1   
+    exit 1
 }
 if {[string eq $out empty.out]} {
     puts "MEMH output file isn't specified"
-    exit 1   
+    exit 1
 }
 if {[string eq $mem_size -1]} {
     puts "Memory size isn't specified"
-    exit 1   
+    exit 1
+}
+
+if {[string eq $mem_offset -1]} {
+    # Calculate Address offset (offset=(0x10000-memory_size))
+    set mem_offset [expr 65536-$mem_size]
+    #puts "using $mem_offset as mem offset"
 }
 
 
@@ -106,7 +118,7 @@ if { "$out"=="-"} {
 # Conversions procedure
 proc hex2dec { val  } {
   set val [format "%u" 0x[string trimleft $val]]
-  return $val 
+  return $val
 }
 
 
@@ -117,11 +129,9 @@ for {set i 0} {$i <= $num_word} {incr i} {
 }
 
 
-# Calculate Address offset (offset=(0x10000-memory_size))
-set mem_offset [expr 65536-$mem_size]
 
 
-# Process input file 
+# Process input file
 while {[gets $f_ihex line] >= 0} {
 
     # Process line
@@ -142,9 +152,10 @@ close $f_ihex
 
 
 # Writing memory array to file
-for {set i 0} {$i <= $num_word} {incr i} { 
+for {set i 0} {$i <= $num_word} {incr i} {
 
     if {![expr $i%16]} {
+	#puts -nonewline $f_out "\n@[format "%04x" [expr $i+$tmp_addr]] "
 	puts -nonewline $f_out "\n@[format "%04x" $i] "
     }
     puts -nonewline $f_out " [format "%02s" $mem_arr($i) ]"

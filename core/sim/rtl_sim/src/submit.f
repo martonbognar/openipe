@@ -57,6 +57,7 @@
 //=============================================================================
 
 +incdir+../../../rtl/verilog/periph/
+../../../rtl/verilog/periph/ipe_periph.v
 ../../../rtl/verilog/periph/omsp_gpio.v
 ../../../rtl/verilog/periph/omsp_timerA.v
 //../../../rtl/verilog/periph/omsp_uart.v

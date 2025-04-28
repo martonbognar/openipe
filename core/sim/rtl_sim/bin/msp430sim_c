@@ -130,9 +130,24 @@ fi
 source   pmem.sh
 
 # Make C program
-echo "Compile, link & generate IHEX file (Program Memory: $pmemsize B, Data Memory: $dmemsize B, Peripheral Space: $persize B)..."
+echo "Compile, link & generate IHEX file (Program Memory: $pmemsize B, Data Memory: $dmemsize B, Peripheral Space: $persize B, Bootcode Memory: $bmemsize B)..."
 cd $softdir
 make clean
+
+cp ../../bin/ipe_linker.x pmem.x
+PMEM_BASE=$((0x10000-$pmemsize))
+STACK_INIT=$((persize+0x0080))
+BMEM_BASE=$((persize+dmemsize))
+BMEM_IVT_BASE=$((BMEM_BASE+bmemsize-0x20))
+sed -ie "s/PMEM_BASE/$PMEM_BASE/g"         pmem.x
+sed -ie "s/PMEM_SIZE/$pmemsize/g"         pmem.x
+sed -ie "s/BMEM_BASE/$BMEM_BASE/g"         pmem.x
+sed -ie "s/BMEM_IVT_BASE/$BMEM_IVT_BASE/g"         pmem.x
+sed -ie "s/BMEM_SIZE/$bmemsize/g"         pmem.x
+sed -ie "s/DMEM_SIZE/$dmemsize/g"         pmem.x
+sed -ie "s/BMEM_SIZE/$bmemsize/g"         pmem.x
+sed -ie "s/PER_SIZE/$persize/g"           pmem.x
+sed -ie "s/STACK_INIT/$STACK_INIT/g"       pmem.x
 make
 cd ../../run/
 
@@ -154,9 +169,38 @@ else
     msp430-objcopy     -O ihex  pmem.elf pmem.ihex
 fi
 
+# Compile bootcode firmware
+echo "Compile, link & generate bootcode IHEX file (Bootcode Memory: $bmemsize B)"
+
+cp  "../bin/template_defs.asm"  ./pmem_defs.asm
+sed -ie "s/PMEM_SIZE/$pmemsize/g"         pmem_defs.asm
+sed -ie "s/PER_SIZE_HEX/$persize/g"       pmem_defs.asm
+sed -ie "s/BMEM_BASE_VAL/$BMEM_BASE/g" pmem_defs.asm
+sed -ie "s/BMEM_SIZE/$bmemsize/g"         pmem_defs.asm
+if [ $MSPGCC_PFX == "msp430-elf" ]; then
+    sed -ie "s/PER_SIZE/.data/g"           pmem_defs.asm
+    sed -ie "s/PMEM_BASE_VAL/.text/g"      pmem_defs.asm
+    sed -ie "s/PMEM_EDE_SIZE/0/g"          pmem_defs.asm
+else
+    sed -ie "s/PER_SIZE/$persize/g"       pmem_defs.asm
+    sed -ie "s/PMEM_BASE_VAL/$PMEM_BASE/g" pmem_defs.asm
+    sed -ie "s/PMEM_EDE_SIZE/$pmemsize/g" pmem_defs.asm
+fi
+
+echo ""
+echo "\$ $MSPGCC_PFX-as      -alsm ../src/ipe/bootcode.s43 -o bootcode.o > bmem.l43"
+$MSPGCC_PFX-as      -alsm ../src/ipe/bootcode.s43 -o bootcode.o    > bmem.l43
+echo "\$ $MSPGCC_PFX-ld      -L$softdir -T $softdir/pmem.x bootcode.o -o bmem.elf"
+$MSPGCC_PFX-ld      -L$softdir -T $softdir/pmem.x   bootcode.o    -o bmem.elf
+echo "\$ $MSPGCC_PFX-objcopy -O ihex bmem.elf bmem.ihex"
+$MSPGCC_PFX-objcopy -O ihex       bmem.elf    bmem.ihex
+echo ""
+bmem_offset=$(($persize+$dmemsize))
+
 # Generate Program memory file
-echo "Convert IHEX file to Verilog MEMH format..."
+echo "Convert IHEX file to Verilog MEMH format... (pmem size: $pmemsize, bmem size: $bmemsize, bmem offset $bmem_offset)"
 ../bin/ihex2mem.tcl -ihex pmem.ihex -out pmem.mem -mem_size $pmemsize
+../bin/ihex2mem.tcl -ihex bmem.ihex -out bmem.mem -mem_size $bmemsize -mem_offset $bmem_offset
 
 # Start verilog simulation
 echo "Start Verilog simulation..."

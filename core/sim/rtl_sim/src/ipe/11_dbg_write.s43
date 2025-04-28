@@ -1,0 +1,72 @@
+; Using the debugger to write IPE memory values or register values during IPE
+; execution do not succeed.
+
+.include "pmem_defs.asm"
+
+    .global main
+    .sect .text
+main:
+    mov #DMEM_220, r1
+    mov #0xcafe, r12 ;; checkpoint 1
+    mov #300, r14
+    call #ipe_wait
+    mov &dummy_struct, r15
+
+    mov #0x800, &MPUIPSEGB1 ;; change boundaries
+    mov #0x840, &MPUIPSEGB2 ;; change boundaries
+    mov #0x0060, &MPUIPC0
+
+    mov #0xbeef, r12 ;; checkpoint 2
+    mov #300, r14
+    call #ipe_wait
+
+    mov #0xdead, r12 ;; checkpoint 3
+    mov #300, r14
+    call #ipe_wait
+
+    mov #0, &MPUIPC0
+    mov &dummy_struct, r15
+
+    br #end_of_test
+
+        /* ----------------------         END OF TEST        --------------- */
+trampoline:
+    ret
+
+end_of_test:
+    nop
+    br #0xffff
+
+    .sect .ipe_seg, "a"
+dummy_struct:
+    .word 1337, 1338, 3, 4
+ipe_wait:
+    mov &dummy_struct, r15
+    mov &dummy_struct+2, r10
+l1:
+    dec r14
+    cmp #0, r14
+    jnz l1
+    clr r15
+    br #trampoline
+
+
+        /* ----------------------         INTERRUPT VECTORS  --------------- */
+
+.section .vectors, "a"
+.word end_of_test    ; Interrupt  0 (lowest priority)    <unused>
+.word end_of_test    ; Interrupt  1                      <unused>
+.word end_of_test    ; Interrupt  2                      <unused>
+.word end_of_test    ; Interrupt  3                      <unused>
+.word end_of_test    ; Interrupt  4                      <unused>
+.word end_of_test    ; Interrupt  5                      <unused>
+.word end_of_test    ; Interrupt  6                      <unused>
+.word end_of_test    ; Interrupt  7                      <unused>
+.word end_of_test    ; Interrupt  8                      <unused>
+.word end_of_test    ; Interrupt  9                      <unused>
+.word end_of_test    ; Interrupt 10                      Watchdog timer
+.word end_of_test    ; Interrupt 11                      <unused>
+.word end_of_test    ; Interrupt 12                      <unused>
+.word end_of_test    ; Interrupt 13                      <unused>
+.word end_of_test    ; Interrupt 14                      NMI
+.word main           ; Interrupt 15 (highest priority)   RESET

@@ -74,6 +74,10 @@ module  openMSP430 (
     pmem_cen,                                // Program Memory chip enable (low active)
     pmem_din,                                // Program Memory data input (optional)
     pmem_wen,                                // Program Memory write byte enable (low active) (optional)
+    bmem_addr,                               // Bootcode Memory address
+    bmem_cen,                                // Bootcode Memory chip enable (low active)
+    bmem_din,                                // Bootcode Memory data input (optional)
+    bmem_wen,                                // Bootcode Memory write byte enable (low active) (optional)
     puc_rst,                                 // Main system reset
     smclk,                                   // ASIC ONLY: SMCLK
     smclk_en,                                // FPGA ONLY: SMCLK enable
@@ -99,6 +103,7 @@ module  openMSP430 (
     nmi,                                     // Non-maskable interrupt (asynchronous)
     per_dout,                                // Peripheral data output
     pmem_dout,                               // Program Memory data output
+    bmem_dout,                               // Bootcode Memory data output
     reset_n,                                 // Reset Pin (low active, asynchronous and non-glitchy)
     scan_enable,                             // ASIC ONLY: Scan enable (active during scan shifting)
     scan_mode,                               // ASIC ONLY: Scan mode
@@ -138,6 +143,10 @@ output [`PMEM_MSB:0] pmem_addr;              // Program Memory address
 output               pmem_cen;               // Program Memory chip enable (low active)
 output        [15:0] pmem_din;               // Program Memory data input (optional)
 output         [1:0] pmem_wen;               // Program Memory write enable (low active) (optional)
+output [`BMEM_MSB:0] bmem_addr;              // Bootcode Memory address
+output               bmem_cen;               // Bootcode Memory chip enable (low active)
+output        [15:0] bmem_din;               // Bootcode Memory data input (optional)
+output         [1:0] bmem_wen;               // Bootcode Memory write enable (low active) (optional)
 output               puc_rst;                // Main system reset
 output               smclk;                  // ASIC ONLY: SMCLK
 output               smclk_en;               // FPGA ONLY: SMCLK enable
@@ -165,6 +174,7 @@ input                dma_wkup;               // ASIC ONLY: DMA Wake-up (asynchro
 input                nmi;                    // Non-maskable interrupt (asynchronous and non-glitchy)
 input         [15:0] per_dout;               // Peripheral data output
 input         [15:0] pmem_dout;              // Program Memory data output
+input         [15:0] bmem_dout;              // Bootcode Memory data output
 input                reset_n;                // Reset Pin (active low, asynchronous and non-glitchy)
 input                scan_enable;            // ASIC ONLY: Scan enable (active during scan shifting)
 input                scan_mode;              // ASIC ONLY: Scan mode
@@ -222,6 +232,7 @@ wire                 fe_pmem_wait;
 wire                 pc_sw_wr;
 wire          [15:0] pc_sw;
 wire          [15:0] pc;
+wire                 fe_decode;
 wire          [15:0] pc_nxt;
 
 wire                 nmi_acc;
@@ -254,6 +265,23 @@ wire                 cpu_halt_st;
 wire                 cpu_halt_cmd;
 wire                 puc_pnd_set;
 
+wire                 bootcode_eu_violation;
+wire                 bootcode_fe_violation;
+wire                 bootcode_dma_violation;
+wire                 bootcode_dbg_violation;
+wire                 ipe_eu_violation;
+`ifndef OMIT_IPE_FIXES
+wire                 ipe_fe_violation;
+`endif
+wire                 ipe_dma_violation;
+wire                 ipe_dbg_mem_violation;
+wire                 ipe_executing;
+wire                 irq_detect;
+wire                 ipe_bootcode_exec;
+wire                 pmem_writing;
+wire          [15:0] ipe_seg_end;
+
+wire          [15:0] per_dout_ipe;
 wire          [15:0] per_dout_or;
 wire          [15:0] per_dout_sfr;
 wire          [15:0] per_dout_wdog;
@@ -347,7 +375,9 @@ omsp_frontend frontend_0 (
     .mclk_wkup         (mclk_wkup),          // Main System Clock wake-up (asynchronous)
     .nmi_acc           (nmi_acc),            // Non-Maskable interrupt request accepted
     .pc                (pc),                 // Program counter
+    .fe_decode         (fe_decode),            // Buffered program counter
     .pc_nxt            (pc_nxt),             // Next PC value (for CALL & IRQ)
+    .irq_detect      (irq_detect),
 
 // INPUTs
     .cpu_en_s          (cpu_en_s),           // Enable CPU code execution (synchronous)
@@ -361,7 +391,13 @@ omsp_frontend frontend_0 (
     .irq               (irq),                // Maskable interrupts
     .mclk              (cpu_mclk),           // Main system clock
     .mdb_in            (fe_mdb_in),          // Frontend Memory data bus input
-    .nmi_pnd           (nmi_pnd),            // Non-maskable interrupt pending
+`ifndef OMIT_IPE_FIXES
+    .nmi_pnd           (nmi_pnd | ipe_fe_violation | bootcode_fe_violation),            // Non-maskable interrupt pending
+    // .fe_violation      (ipe_fe_violation | bootcode_fe_violation),
+`else
+    .nmi_pnd           (nmi_pnd | bootcode_fe_violation),            // Non-maskable interrupt pending
+    // .fe_violation      (bootcode_fe_violation),
+`endif
     .nmi_wkup          (nmi_wkup),           // NMI Wakeup
     .pc_sw             (pc_sw),              // Program counter software value
     .pc_sw_wr          (pc_sw_wr),           // Program counter software write
@@ -369,7 +405,14 @@ omsp_frontend frontend_0 (
     .scan_enable       (scan_enable),        // Scan enable (active during scan shifting)
     .wdt_irq           (wdt_irq),            // Watchdog-timer interrupt
     .wdt_wkup          (wdt_wkup),           // Watchdog Wakeup
-    .wkup              (wkup)                // System Wake-up (asynchronous)
+    .wkup              (wkup),               // System Wake-up (asynchronous)
+`ifdef HW_DISABLE_IPE_IRQ
+    .ipe_executing     (ipe_executing),
+`elsif SECURE_IRQ_SW
+    .ipe_executing     (ipe_executing),
+    .ipe_seg_end       (ipe_seg_end),
+`endif
+    .pmem_writing      (pmem_writing)
 );
 
 
@@ -393,6 +436,11 @@ omsp_execution_unit execution_unit_0 (
     .scg1              (scg1),               // System clock generator 1. Turns off the SMCLK
 
 // INPUTs
+`ifndef OMIT_SP_SWITCHING
+    .ipe_exec          (ipe_executing),
+    .irq_detect      (irq_detect),
+    .bootcode_exec     (ipe_bootcode_exec),
+`endif
     .dbg_halt_st       (cpu_halt_st),        // Halt/Run status from CPU
     .dbg_mem_dout      (dbg_mem_dout),       // Debug unit data output
     .dbg_reg_wr        (dbg_reg_wr),         // Debug unit CPU register write
@@ -448,10 +496,15 @@ omsp_mem_backbone mem_backbone_0 (
     .pmem_cen          (pmem_cen),           // Program Memory chip enable (low active)
     .pmem_din          (pmem_din),           // Program Memory data input (optional)
     .pmem_wen          (pmem_wen),           // Program Memory write enable (low active) (optional)
+    .bmem_addr         (bmem_addr),          // Bootcode Memory address
+    .bmem_cen          (bmem_cen),           // Bootcode Memory chip enable (low active)
+    .bmem_din          (bmem_din),           // Bootcode Memory data input (optional)
+    .bmem_wen          (bmem_wen),           // Bootcode Memory write enable (low active) (optional)
+    .pmem_writing      (pmem_writing),
 
 // INPUTs
     .cpu_halt_st       (cpu_halt_st),        // Halt/Run status from CPU
-    .dbg_halt_cmd      (dbg_halt_cmd),       // Debug interface Halt CPU command
+    .dbg_halt_cmd      (dbg_halt_cmd & ~ipe_executing & ~ipe_bootcode_exec),       // Debug interface Halt CPU command
     .dbg_mem_addr      (dbg_mem_addr[15:1]), // Debug address for rd/wr access
     .dbg_mem_dout      (dbg_mem_dout),       // Debug unit data output
     .dbg_mem_en        (dbg_mem_en),         // Debug unit memory enable
@@ -471,11 +524,61 @@ omsp_mem_backbone mem_backbone_0 (
     .dma_we            (dma_we),             // Direct Memory Access write byte enable (high active)
     .per_dout          (per_dout_or),        // Peripheral data output
     .pmem_dout         (pmem_dout),          // Program Memory data output
+    .bmem_dout         (bmem_dout),          // Bootcode Memory data output
     .puc_rst           (puc_rst),            // Main system reset
-    .scan_enable       (scan_enable)         // Scan enable (active during scan shifting)
+    .scan_enable       (scan_enable),        // Scan enable (active during scan shifting)
+    .ipe_bootcode_exec     (ipe_bootcode_exec),
+    .ipe_eu_violation  (ipe_eu_violation),
+    .ipe_dma_violation (ipe_dma_violation),
+    .ipe_dbg_mem_violation (ipe_dbg_mem_violation),
+    .bootcode_eu_violation (bootcode_eu_violation),
+    .bootcode_dma_violation (bootcode_dma_violation),
+    .bootcode_dbg_violation (bootcode_dbg_violation),
+    .bootcode_fe_violation (bootcode_fe_violation),
+    .ipe_fe_violation (ipe_fe_violation)
 );
 
 wire UNUSED_fe_mab_0 = fe_mab[0];
+
+ipe_periph ipe (
+
+// peripheral OUTPUTs
+    .per_dout          (per_dout_ipe),       // Peripheral data output
+// control OUTPUTs
+    .ipe_eu_violation  (ipe_eu_violation),   // Detected invalid execution unit access
+    `ifndef OMIT_IPE_FIXES
+    .ipe_fe_violation  (ipe_fe_violation),   // Detected invalid frontend access
+    `endif
+    .ipe_dma_violation (ipe_dma_violation),
+    .ipe_dbg_mem_violation (ipe_dbg_mem_violation),
+    .ipe_executing     (ipe_executing),
+    .ipe_bootcode_exec (ipe_bootcode_exec),
+    .bootcode_eu_violation (bootcode_eu_violation),
+    .bootcode_fe_violation (bootcode_fe_violation),
+    .bootcode_dma_violation (bootcode_dma_violation),
+    .bootcode_dbg_violation (bootcode_dbg_violation),
+`ifdef SECURE_IRQ_SW
+    .ipe_seg_end (ipe_seg_end),
+`endif
+`ifdef SECURE_IRQ_FW
+    .irq_handling(|irq),
+`endif
+// peripheral INPUTs
+    .mclk              (dma_mclk),           // Main system clock
+    .per_addr          (per_addr),           // Peripheral address
+    .per_din           (per_din),            // Peripheral data input
+    .per_en            (per_en),             // Peripheral enable (high active)
+    .per_we            (per_we),             // Peripheral write enable (high active)
+    .puc_rst           (puc_rst),            // Main system reset
+// control INPUTs
+    .fe_decode           (fe_decode | |irq_acc),             // Buffered PC of the current instruction
+    .eu_mab            (eu_mab),              // Execution unit memory address bus
+    .fe_pc             (pc),                  // Frontend current fetch address
+    .fe_pc_nxt         (pc_nxt),              // Frontend next fetch address
+    .nmi_acc           (nmi_acc),             // NMI accepted
+    .dma_addr          ({dma_addr, 1'b0}),
+    .dbg_mem_addr      (dbg_mem_addr)
+);
 
 //=============================================================================
 // 6)  SPECIAL FUNCTION REGISTERS
@@ -583,6 +686,7 @@ assign per_dout_mpy = 16'h0000;
 //=============================================================================
 
 assign  per_dout_or  =  per_dout      |
+                        per_dout_ipe  |
                         per_dout_clk  |
                         per_dout_sfr  |
                         per_dout_wdog |

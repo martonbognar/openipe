@@ -68,6 +68,11 @@ module  omsp_mem_backbone (
     pmem_cen,                           // Program Memory chip enable (low active)
     pmem_din,                           // Program Memory data input (optional)
     pmem_wen,                           // Program Memory write enable (low active) (optional)
+    bmem_addr,                          // Bootcode Memory address
+    bmem_cen,                           // Bootcode Memory chip enable (low active)
+    bmem_din,                           // Bootcode Memory data input (optional)
+    bmem_wen,                           // Bootcode Memory write enable (low active) (optional)
+    pmem_writing,                       // Currently writing to program memory
 
 // INPUTs
     cpu_halt_st,                        // Halt/Run status from CPU
@@ -91,8 +96,18 @@ module  omsp_mem_backbone (
     dma_we,                             // Direct Memory Access write byte enable (high active)
     per_dout,                           // Peripheral data output
     pmem_dout,                          // Program Memory data output
+    bmem_dout,                          // Bootcode Memory data output
     puc_rst,                            // Main system reset
-    scan_enable                         // Scan enable (active during scan shifting)
+    scan_enable,                        // Scan enable (active during scan shifting),
+    ipe_bootcode_exec,
+    ipe_eu_violation,
+    ipe_dma_violation,
+    ipe_dbg_mem_violation,
+    bootcode_eu_violation,
+    bootcode_dma_violation,
+    bootcode_dbg_violation,
+    bootcode_fe_violation,
+    ipe_fe_violation,
 );
 
 // OUTPUTs
@@ -117,6 +132,11 @@ output [`PMEM_MSB:0] pmem_addr;         // Program Memory address
 output               pmem_cen;          // Program Memory chip enable (low active)
 output        [15:0] pmem_din;          // Program Memory data input (optional)
 output         [1:0] pmem_wen;          // Program Memory write enable (low active) (optional)
+output [`BMEM_MSB:0] bmem_addr;         // Bootcode Memory address
+output               bmem_cen;          // Bootcode Memory chip enable (low active)
+output        [15:0] bmem_din;          // Bootcode Memory data input (optional)
+output         [1:0] bmem_wen;          // Bootcode Memory write enable (low active) (optional)
+output               pmem_writing;
 
 // INPUTs
 //=========
@@ -141,8 +161,18 @@ input                dma_priority;      // Direct Memory Access priority (0:low 
 input          [1:0] dma_we;            // Direct Memory Access write byte enable (high active)
 input         [15:0] per_dout;          // Peripheral data output
 input         [15:0] pmem_dout;         // Program Memory data output
+input         [15:0] bmem_dout;         // Bootcode Memory data output
 input                puc_rst;           // Main system reset
 input                scan_enable;       // Scan enable (active during scan shifting)
+input                ipe_bootcode_exec;
+input                ipe_eu_violation;
+input                ipe_dma_violation;
+input                ipe_dbg_mem_violation;
+input                bootcode_eu_violation;
+input                bootcode_dma_violation;
+input                bootcode_dbg_violation;
+input                bootcode_fe_violation;
+input                ipe_fe_violation;
 
 wire                 ext_mem_en;
 wire          [15:0] ext_mem_din;
@@ -168,7 +198,7 @@ wire                 ext_per_en;
 assign      cpu_halt_cmd  =  dbg_halt_cmd | (dma_en & dma_priority);
 
 // Return ERROR response if address lays outside the memory spaces (Peripheral, Data & Program memories)
-assign      dma_resp      = ~dbg_mem_en & ~(ext_dmem_sel | ext_pmem_sel | ext_per_sel) & dma_en;
+assign      dma_resp      = ~dbg_mem_en & (~(ext_dmem_sel | ext_pmem_sel | ext_per_sel) | ipe_dma_violation | bootcode_dma_violation) & dma_en;
 
 // Master interface access is ready when the memory access occures
 assign      dma_ready     = ~dbg_mem_en &  (ext_dmem_en  | ext_pmem_en  | ext_per_en | dma_resp);
@@ -181,10 +211,10 @@ always @ (posedge mclk or posedge puc_rst)
   else          dma_ready_dly <=  dma_ready;
 
 // Mux between debug and master interface
-assign      ext_mem_en    =  dbg_mem_en | dma_en;
-wire  [1:0] ext_mem_wr    =  dbg_mem_en ? dbg_mem_wr    :  dma_we;
-wire [15:1] ext_mem_addr  =  dbg_mem_en ? dbg_mem_addr  :  dma_addr;
-wire [15:0] ext_mem_dout  =  dbg_mem_en ? dbg_mem_dout  :  dma_din;
+assign      ext_mem_en    =  (dbg_mem_en & ~ipe_dbg_mem_violation & ~bootcode_dbg_violation) | (dma_en & ~ipe_dma_violation & ~bootcode_dma_violation);  // TODO: refactor to a single dma_violation, dbg_violation signal
+wire  [1:0] ext_mem_wr    =  (dbg_mem_en & ~ipe_dbg_mem_violation & ~bootcode_dbg_violation) ? dbg_mem_wr    :  dma_we;
+wire [15:1] ext_mem_addr  =  (dbg_mem_en & ~ipe_dbg_mem_violation & ~bootcode_dbg_violation) ? dbg_mem_addr  :  dma_addr;
+wire [15:0] ext_mem_dout  =  (dbg_mem_en & ~ipe_dbg_mem_violation & ~bootcode_dbg_violation) ? dbg_mem_dout  :  dma_din;
 
 // External interface read data
 assign      dbg_mem_din   =  ext_mem_din;
@@ -200,7 +230,7 @@ assign      dma_resp      =  1'b1;
 assign      dma_ready     =  1'b1;
 
 // Debug interface only
-assign      ext_mem_en    =  dbg_mem_en;
+assign      ext_mem_en    =  (dbg_mem_en & ~ipe_dbg_mem_violation & ~bootcode_dbg_violation);
 wire  [1:0] ext_mem_wr    =  dbg_mem_wr;
 wire [15:1] ext_mem_addr  =  dbg_mem_addr;
 wire [15:0] ext_mem_dout  =  dbg_mem_dout;
@@ -226,7 +256,7 @@ parameter          DMEM_END      = `DMEM_BASE+`DMEM_SIZE;
 // Execution unit access
 wire               eu_dmem_sel   = (eu_mab>=(`DMEM_BASE>>1)) &
                                    (eu_mab< ( DMEM_END >>1));
-wire               eu_dmem_en    = eu_mb_en & eu_dmem_sel;
+wire               eu_dmem_en    = eu_mb_en & eu_dmem_sel & ~ipe_eu_violation;
 wire        [15:0] eu_dmem_addr  = {1'b0, eu_mab}-(`DMEM_BASE>>1);
 
 // Front-end access
@@ -245,6 +275,31 @@ wire         [1:0] dmem_wen      =   ext_dmem_en ? ~ext_mem_wr                 :
 wire [`DMEM_MSB:0] dmem_addr     =   ext_dmem_en ?  ext_dmem_addr[`DMEM_MSB:0] :  eu_dmem_addr[`DMEM_MSB:0];
 wire        [15:0] dmem_din      =   ext_dmem_en ?  ext_mem_dout               :  eu_mdb_out;
 
+//------------------------------------------
+// BOOTCODE-MEMORY Interface
+//------------------------------------------
+parameter          BMEM_END      = `BMEM_BASE+`BMEM_SIZE;
+
+// Execution unit access
+wire               eu_bmem_sel   = (eu_mab>=(`BMEM_BASE>>1)) &
+                                   (eu_mab< ( BMEM_END >>1));
+wire               eu_bmem_en    = eu_mb_en & eu_bmem_sel & ~bootcode_eu_violation;
+wire        [15:0] eu_bmem_addr  = {1'b0, eu_mab}-(`BMEM_BASE>>1);
+
+// Front-end access
+wire               fe_bmem_sel   = (fe_mab>=(`BMEM_BASE>>1)) &
+                                   (fe_mab< ( BMEM_END >>1));
+wire               fe_bmem_en    = fe_mb_en & fe_bmem_sel;
+wire        [15:0] fe_bmem_addr  = {1'b0, fe_mab}-(`BMEM_BASE>>1);
+
+// External Master/Debug interface access
+// -- not allowed to access bootcode memory --
+
+// Program-Memory Interface (Execution unit has priority over the Front-end)
+wire               bmem_cen      = ~(fe_bmem_en | eu_bmem_en);
+wire         [1:0] bmem_wen      =  eu_bmem_en ? ~eu_mb_wr                 : 2'b11;
+wire [`BMEM_MSB:0] bmem_addr     =  eu_bmem_en  ?  eu_bmem_addr[`BMEM_MSB:0]  : fe_pmem_addr[`BMEM_MSB:0];
+wire        [15:0] bmem_din      =  eu_mdb_out;
 
 //------------------------------------------
 // PROGRAM-MEMORY Interface
@@ -252,9 +307,9 @@ wire        [15:0] dmem_din      =   ext_dmem_en ?  ext_mem_dout               :
 
 parameter          PMEM_OFFSET   = (16'hFFFF-`PMEM_SIZE+1);
 
-// Execution unit access (only read access are accepted)
+// Execution unit access
 wire               eu_pmem_sel   = (eu_mab>=(PMEM_OFFSET>>1));
-wire               eu_pmem_en    = eu_mb_en & ~|eu_mb_wr & eu_pmem_sel;
+wire               eu_pmem_en    = eu_mb_en & eu_pmem_sel & ~ipe_eu_violation;
 wire        [15:0] eu_pmem_addr  = eu_mab-(PMEM_OFFSET>>1);
 
 // Front-end access
@@ -270,13 +325,12 @@ wire        [15:0] ext_pmem_addr = {1'b0, ext_mem_addr[15:1]}-(PMEM_OFFSET>>1);
 
 // Program-Memory Interface (Execution unit has priority over the Front-end)
 wire               pmem_cen      = ~(fe_pmem_en | eu_pmem_en | ext_pmem_en);
-wire         [1:0] pmem_wen      =  ext_pmem_en ? ~ext_mem_wr                 : 2'b11;
+wire         [1:0] pmem_wen      =  ext_pmem_en ? ~ext_mem_wr : eu_pmem_en ? ~eu_mb_wr                 : 2'b11;
 wire [`PMEM_MSB:0] pmem_addr     =  ext_pmem_en ?  ext_pmem_addr[`PMEM_MSB:0] :
                                     eu_pmem_en  ?  eu_pmem_addr[`PMEM_MSB:0]  : fe_pmem_addr[`PMEM_MSB:0];
-wire        [15:0] pmem_din      =  ext_mem_dout;
+wire        [15:0] pmem_din      =  ext_pmem_en ? ext_mem_dout : eu_mdb_out;
 
-wire               fe_pmem_wait  = (fe_pmem_en & eu_pmem_en);
-
+wire               fe_pmem_wait  = (fe_pmem_en & eu_pmem_en) | (fe_bmem_en & eu_bmem_en);
 
 //------------------------------------------
 // PERIPHERALS Interface
@@ -313,57 +367,88 @@ always @ (posedge mclk or posedge puc_rst)
 //------------------------------------------
 // Whenever the frontend doesn't access the program memory,  backup the data
 
-// Detect whenever the data should be backuped and restored
-reg         fe_pmem_en_dly;
+reg fe_violation_buf;
 always @(posedge mclk or posedge puc_rst)
-  if (puc_rst) fe_pmem_en_dly <=  1'b0;
-  else         fe_pmem_en_dly <=  fe_pmem_en;
+  if (puc_rst)  fe_violation_buf <= 1'b0;
+  else          fe_violation_buf <= ipe_fe_violation | bootcode_fe_violation;
 
-wire fe_pmem_save    = (~fe_pmem_en &  fe_pmem_en_dly) & ~cpu_halt_st;
-wire fe_pmem_restore = ( fe_pmem_en & ~fe_pmem_en_dly) |  cpu_halt_st;
+// Mux to select if FE is executing in bootcode or pmem
+// otherwise FE loses instruction fetches when EU accesses the bootcode data
+wire fe_pbmem_en = fe_bmem_en | fe_pmem_en;
+wire [15:0] pbmem_dout  = fe_violation_buf ? 16'h3FFF     :
+                          ipe_bootcode_exec ? bmem_dout : pmem_dout;
+
+wire eu_pbmem_en = ipe_bootcode_exec ? eu_bmem_en : eu_pmem_en;
+assign pmem_writing  = eu_pbmem_en & |eu_mb_wr;
+
+// Detect whenever the data should be backuped and restored
+reg         fe_pbmem_en_dly;
+always @(posedge mclk or posedge puc_rst)
+  if (puc_rst) fe_pbmem_en_dly <=  1'b0;
+  else         fe_pbmem_en_dly <=  fe_pbmem_en;
+
+wire fe_pbmem_save    = (~fe_pbmem_en &  fe_pbmem_en_dly) & ~cpu_halt_st;
+wire fe_pbmem_restore = ( fe_pbmem_en & ~fe_pbmem_en_dly) |  cpu_halt_st;
 
 `ifdef CLOCK_GATING
 wire mclk_bckup_gated;
 omsp_clock_gate clock_gate_bckup (.gclk(mclk_bckup_gated),
-                                  .clk (mclk), .enable(fe_pmem_save), .scan_enable(scan_enable));
+                                  .clk (mclk), .enable(fe_pbmem_save), .scan_enable(scan_enable));
 `define MCLK_BCKUP           mclk_bckup_gated
 `else
 wire    UNUSED_scan_enable = scan_enable;
 `define MCLK_BCKUP           mclk        // use macro to solve delta cycle issues with some mixed VHDL/Verilog simulators
 `endif
 
-reg  [15:0] pmem_dout_bckup;
+reg  [15:0] pbmem_dout_bckup;
 always @(posedge `MCLK_BCKUP or posedge puc_rst)
-  if (puc_rst)              pmem_dout_bckup     <=  16'h0000;
+  if (puc_rst)              pbmem_dout_bckup     <=  16'h0000;
 `ifdef CLOCK_GATING
-  else                      pmem_dout_bckup     <=  pmem_dout;
+  else                      pbmem_dout_bckup     <=  pbmem_dout;
 `else
-  else if (fe_pmem_save)    pmem_dout_bckup     <=  pmem_dout;
+  else if (fe_pbmem_save)   pbmem_dout_bckup     <=  pbmem_dout;
 `endif
 
 // Mux between the Program memory data and the backup
-reg         pmem_dout_bckup_sel;
+reg         pbmem_dout_bckup_sel;
 always @(posedge mclk or posedge puc_rst)
-  if (puc_rst)              pmem_dout_bckup_sel <=  1'b0;
-  else if (fe_pmem_save)    pmem_dout_bckup_sel <=  1'b1;
-  else if (fe_pmem_restore) pmem_dout_bckup_sel <=  1'b0;
+  if (puc_rst)               pbmem_dout_bckup_sel <=  1'b0;
+  else if (fe_pbmem_save)    pbmem_dout_bckup_sel <=  1'b1;
+  else if (fe_pbmem_restore) pbmem_dout_bckup_sel <=  1'b0;
 
-assign fe_mdb_in = pmem_dout_bckup_sel ? pmem_dout_bckup : pmem_dout;
-
+assign fe_mdb_in = pbmem_dout_bckup_sel ? pbmem_dout_bckup :
+                   (fe_bmem_en & ~bootcode_fe_violation) ? bmem_dout :
+                   ~ipe_fe_violation ? pmem_dout :
+                   16'h3FFF;
+//assign fe_mdb_in = pmem_dout_bckup_sel ? pmem_dout_bckup :
+//                   (bmem_dout_bckup_sel & ~fe_pmem_en) ? bmem_dout_bckup :
+//                   fe_bmem_en ? bmem_dout : pmem_dout;
 
 //------------------------------------------
 // Execution-Unit data Mux
 //------------------------------------------
 
-// Select between Peripherals, Program and Data memories
-reg [1:0] eu_mdb_in_sel;
+// Select between Peripherals, Program, Bootcode, and Data memories
+reg [2:0] eu_mdb_in_sel;
 always @(posedge mclk or posedge puc_rst)
   if (puc_rst)  eu_mdb_in_sel  <= 2'b00;
-  else          eu_mdb_in_sel  <= {eu_pmem_en, eu_per_en};
+  else          eu_mdb_in_sel  <= {eu_pmem_en, eu_per_en, eu_bmem_sel};
+
+reg ipe_eu_violation_buf;
+always @(posedge mclk or posedge puc_rst)
+  if (puc_rst)  ipe_eu_violation_buf <= 1'b0;
+  else          ipe_eu_violation_buf <= ipe_eu_violation;
+
+reg bootcode_eu_violation_buf;
+always @(posedge mclk or posedge puc_rst)
+  if (puc_rst)  bootcode_eu_violation_buf <= 1'b0;
+  else          bootcode_eu_violation_buf <= bootcode_eu_violation;
 
 // Mux
-assign          eu_mdb_in       = eu_mdb_in_sel[1] ? pmem_dout    :
-                                  eu_mdb_in_sel[0] ? per_dout_val : dmem_dout;
+assign          eu_mdb_in       = (ipe_eu_violation_buf | bootcode_eu_violation_buf) ? 16'h3FFF :
+                                  eu_mdb_in_sel[2] ? pmem_dout    :
+                                  eu_mdb_in_sel[1] ? per_dout_val :
+                                  eu_mdb_in_sel[0] ? bmem_dout : dmem_dout;
 
 
 //------------------------------------------
@@ -376,8 +461,22 @@ always @(posedge mclk or posedge puc_rst)
   if (puc_rst)  ext_mem_din_sel <= 2'b00;
   else          ext_mem_din_sel <= {ext_pmem_en, ext_per_en};
 
+reg dma_violation_buf;
+always @(posedge mclk or posedge puc_rst)
+  if (puc_rst)  dma_violation_buf <= 1'b0;
+  else          dma_violation_buf <= ipe_dma_violation | bootcode_dma_violation;
+
+reg dbg_mem_violation_buf;
+always @(posedge mclk or posedge puc_rst)
+  if (puc_rst)  dbg_mem_violation_buf <= 1'b0;
+  else          dbg_mem_violation_buf <= ipe_dbg_mem_violation | bootcode_dbg_violation;
+
+wire dma_violation_prev = dma_ready_dly & dma_violation_buf;
+
 // Mux
-assign          ext_mem_din      = ext_mem_din_sel[1] ? pmem_dout    :
+assign          ext_mem_din      = dma_violation_prev ? 16'h3FFF     :
+                                   (dbg_mem_violation_buf & ~dma_ready_dly) ?  16'h3FFF     : // since dbg_en is not used, we check here whether this is a response to a DMA request, and only return the violation value for DBG if it's a response to DBG
+                                   ext_mem_din_sel[1] ? pmem_dout    :
                                    ext_mem_din_sel[0] ? per_dout_val : dmem_dout;
 
 

@@ -45,8 +45,13 @@ WAIT_FUNC:
 	dec r14
 	jnz WAIT_FUNC
 	ret
-	
+
 main:
+	; NOTE: timing alignment due to bootcode execution
+.rept 11
+	nop
+.endr
+
 	; Enable GPIO interrupts on P1[0]
 	mov.b #0x00, &P1DIR
 	mov.b #0x00, &P1IFG
@@ -59,7 +64,7 @@ main:
 
 	mov     #0x1000, r15
 
-	
+
         /* -------------- SCG1   (<=> R2[7]): turn off SMCLK --------------- */
 
  	mov.b  #0x06, &BCSCTL2  ; # Div /8
@@ -86,10 +91,10 @@ main:
 	mov    #0x1005, r15
  	mov    #0x0020, r14
         call   #WAIT_FUNC
-	
+
 	mov     #0x2000, r15
 
-	
+
         /* -------------- OSCOFF (<=> R2[5]): turn off LFXT1CLK --------------- */
 
  	mov.b  #0x00, &BCSCTL2  ; # Div /1 --> select DCOCLK
@@ -111,7 +116,7 @@ main:
 	mov    #0x2004, r15     ; # OSCOFF=1 (LFXT1 off) return from IRQ
  	mov    #0x0050, r14
         call   #WAIT_FUNC
-	
+
   	mov.b  #0x08, &BCSCTL2  ; # Div /1 --> SMCLK select LFXT1CLK
  	mov    #0x0028, r2      ; # OSCOFF=1 (LFXT1 off)
  	mov    #0x2005, r15
@@ -123,10 +128,10 @@ main:
 	mov    #0x2006, r15
  	mov    #0x0050, r14
         call   #WAIT_FUNC
-	
+
 	mov     #0x3000, r15
 
-	
+
         /* -------------- CPUOFF (<=> R2[4]): turn off CPU    --------------- */
 
 	; Enable GPIO interrupts on P2[0]
@@ -153,8 +158,11 @@ main:
         call   #WAIT_FUNC
 
 	mov     #0x4000, r15
-	
 
+
+	nop
+	nop
+	nop
         /* -------------- DMA_SCG1 --------------------------------------------- */
 
  	mov.b  #0x06, &BCSCTL2  ; # Div /8
@@ -182,7 +190,7 @@ main:
 	mov    #0x4004, r15
  	mov    #0x0020, r14
         call   #WAIT_FUNC
-	
+
  	mov.b  #0x00, &BCSCTL1  ; # DMA_OSCOFF=0 / DMA_SCG1=0
 	mov    #0x0088, r2      ; # SCG1=1 (SMCLK off)
 	mov    #0x4005, r15
@@ -193,7 +201,7 @@ main:
 	mov    #0x4006, r15
  	mov    #0x0020, r14
         call   #WAIT_FUNC
-	
+
 	mov    #0x5000, r15
 
         /* -------------- DMA_OSCOFF --------------------------------------------------- */
@@ -223,7 +231,7 @@ main:
 	mov    #0x5004, r15
  	mov    #0x0020, r14
         call   #WAIT_FUNC
-	
+
  	mov.b  #0x00, &BCSCTL1  ; # DMA_OSCOFF=0 / DMA_SCG1=0
 	mov    #0x0028, r2      ; # OSCOFF=1 (LFXT1 off)
 	mov    #0x5005, r15
@@ -234,17 +242,17 @@ main:
 	mov    #0x5006, r15
  	mov    #0x0020, r14
         call   #WAIT_FUNC
-	
+
 	mov    #0x6000, r15
 
-	
-				
+
+
         /* ----------------------         END OF TEST        --------------- */
 end_of_test:
 	nop
 	br #0xffff
 
-	  
+
         /* ----------------------      INTERRUPT ROUTINES    --------------- */
 
 PORT1_VECTOR:
@@ -253,7 +261,7 @@ PORT1_VECTOR:
         call   #WAIT_FUNC
 	pop        r14
 	mov.b #0x00, &P1IFG
-	reti	
+	reti
 
 PORT2_VECTOR:
 	push       r14
@@ -262,7 +270,7 @@ PORT2_VECTOR:
 	pop        r14
 	mov.b #0x00, &P2IFG
         bic    #0x10, 0(r1) ;exit lowpower mode
-	reti	
+	reti
 
 
         /* ----------------------         INTERRUPT VECTORS  --------------- */

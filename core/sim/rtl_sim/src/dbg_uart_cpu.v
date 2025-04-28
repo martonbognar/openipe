@@ -140,7 +140,8 @@ initial
       test_var = inst_number;
       repeat(50) @(posedge mclk);
       if (test_var !== inst_number)       tb_error("====== RESET / BREAK ON RESET: BREAK ON RESET error- test 5 =====");
-      if (r0       !== irq_vect_15)       tb_error("====== RESET / BREAK ON RESET: BREAK ON RESET error- test 6 =====");
+      // XXX Note: bootcode/ipe delays cpu_halt_cmd with one instruction..
+      if (r0       !== irq_vect_15+4)       tb_error("====== RESET / BREAK ON RESET: BREAK ON RESET error- test 6 =====");
 
       dbg_uart_wr(CPU_STAT,  16'h0004); // CLEAR STATUS
       dbg_uart_rd(CPU_STAT);            // READ STATUS

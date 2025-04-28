@@ -1,0 +1,93 @@
+#!/bin/bash
+
+# Enable/Disable waveform dumping
+OMSP_NODUMP=0
+export OMSP_NODUMP
+
+# Choose GCC toolchain prefix ('msp430' for MSPGCC / 'msp430-elf' for GCC RedHat/TI)
+# Note: default to MSPGCC until GCC RedHat/TI is mature enough
+if command -v msp430-gcc >/dev/null; then
+    MSPGCC_PFX=msp430
+else
+    MSPGCC_PFX=msp430-elf
+fi
+#MSPGCC_PFX=msp430-elf
+export MSPGCC_PFX
+
+# Choose simulator:
+#                   - iverilog  : Icarus Verilog  (default)
+#                   - cver      : CVer
+#                   - verilog   : Verilog-XL
+#                   - ncverilog : NC-Verilog
+#                   - vcs       : VCS
+#                   - vsim      : Modelsim
+#                   - isim      : Xilinx simulator
+OMSP_SIMULATOR=iverilog
+export OMSP_SIMULATOR
+
+rm -rf cov_work
+
+# Cleanup from previous regression
+LOG_DIR=./log
+rm -rf $LOG_DIR/*
+mkdir -p $LOG_DIR
+
+export __IPE_SIM=1
+../bin/msp430sim ipe/1_noflag | tee $LOG_DIR/1_noflag.log
+../bin/msp430sim ipe/2_incorrect_pointer | tee $LOG_DIR/2_incorrect_pointer.log
+../bin/msp430sim ipe/3_correct_pointer | tee $LOG_DIR/3_correct_pointer.log
+../bin/msp430sim ipe/4_existing_pointer | tee $LOG_DIR/4_existing_pointer.log
+../bin/msp430sim ipe/5_locked_registers | tee $LOG_DIR/5_locked_registers.log
+../bin/msp430sim ipe/6_changing_registers | tee $LOG_DIR/6_changing_registers.log
+../bin/msp430sim ipe/7_sw_read | tee $LOG_DIR/7_sw_read.log
+../bin/msp430sim ipe/8_sw_write | tee $LOG_DIR/8_sw_write.log
+../bin/msp430sim ipe/9_sw_jump | tee $LOG_DIR/9_sw_jump.log
+../bin/msp430sim ipe/10_dbg_read | tee $LOG_DIR/10_dbg_read.log
+../bin/msp430sim ipe/11_dbg_write | tee $LOG_DIR/11_dbg_write.log
+../bin/msp430sim ipe/12_dbg_halt | tee $LOG_DIR/12_dbg_halt.log
+
+unset __IPE_SIM
+../bin/msp430sim ipe/13_dma_read | tee $LOG_DIR/13_dma_read.log
+../bin/msp430sim ipe/14_dma_write | tee $LOG_DIR/14_dma_write.log
+../bin/msp430sim ipe/20_bootcode_dma_write | tee $LOG_DIR/20_bootcode_dma_write.log
+
+export __IPE_SIM=1
+../bin/msp430sim ipe/15_inside_access | tee $LOG_DIR/15_inside_access.log
+../bin/msp430sim ipe/16_call_exploit | tee $LOG_DIR/16_call_exploit.log
+../bin/msp430sim ipe/17_irq_exploit | tee $LOG_DIR/17_irq_exploit.log
+../bin/msp430sim ipe/18_bootcode_sw_write | tee $LOG_DIR/18_bootcode_sw_write.log
+../bin/msp430sim ipe/19_bootcode_dbg_write | tee $LOG_DIR/19_bootcode_dbg_write.log
+../bin/msp430sim ipe/21_bootcode_sw_jump | tee $LOG_DIR/21_bootcode_sw_jump.log
+../bin/msp430sim ipe/23_malicious_reti | tee $LOG_DIR/23_malicious_reti.log
+../bin/msp430sim ipe/27_nmi_handler | tee $LOG_DIR/27_nmi_handler.log
+
+__IPE_IRQ_SW=1 ../bin/msp430sim ipe/use-case/24_secure_irq_sw | tee $LOG_DIR/24_secure_irq_sw.log
+
+__IPE_IRQ_FW=1 ../bin/msp430sim ipe/use-case/25_secure_irq_fw | tee $LOG_DIR/25_secure_irq_fw.log
+__IPE_IRQ_FW=1 ../bin/msp430sim ipe/use-case/26_nemesis_mitigation | tee $LOG_DIR/26_nemesis_mitigation.log
+
+# Report regression results
+../bin/parse_results $LOG_DIR
+
+FIRST_RES=$?
+
+rm -rf cov_work
+
+# Cleanup from previous regression
+LOG_DIR=./log
+rm -rf $LOG_DIR/*
+mkdir -p $LOG_DIR
+
+export __OMIT_IPE_FIXES=1
+export __OMIT_SP_SWITCHING=1
+../bin/msp430sim ipe/9_sw_jump | tee $LOG_DIR/9_sw_jump.log
+../bin/msp430sim ipe/16_call_exploit | tee $LOG_DIR/16_call_exploit.log
+../bin/msp430sim ipe/17_irq_exploit | tee $LOG_DIR/17_irq_exploit.log
+
+# Report regression results
+../bin/parse_results $LOG_DIR
+
+if [ $? -ne 3 ] || [ $FIRST_RES -ne 0 ]; then
+    exit 1
+fi
+

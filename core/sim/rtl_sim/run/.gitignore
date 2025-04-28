@@ -1,0 +1,13 @@
+pmem.*
+simv
+stdout.txt
+stimulus.v
+tb_openMSP430.vcd
+signals.gtkw
+pmem_defs.asm
+pmem_defs.asme
+*.mem
+*.o
+*.elf
+*.l43
+*.ihex

@@ -46,6 +46,24 @@
 `include "openMSP430_undefines.v"
 `endif
 
+// `define INCLUDE_BMEM  // firmware memory implemented on FPGA
+// `define OMIT_IPE_FIXES  // do not include hardware fixes from the IPE Exposure paper (true IPE functionality)
+// `define OMIT_SP_SWITCHING  // do not automatically switch stack pointer when entering/exiting IPE (true IPE functionality)
+// `define HW_DISABLE_IPE_IRQ  // disable interrupts during IPE execution
+// `define SECURE_IRQ_SW  // secure interrupt handling: "software solution" with two IVTs
+// `define SECURE_IRQ_FW  // secure interrupt handling by using the firmware as a trusted component
+
+// secure interrupt handling implies additional protections
+`ifdef SECURE_IRQ_SW
+  `undef OMIT_IPE_FIXES
+  `undef OMIT_SP_SWITCHING
+`endif
+
+`ifdef SECURE_IRQ_FW
+  `undef OMIT_IPE_FIXES
+  `undef OMIT_SP_SWITCHING
+`endif
+
 //============================================================================
 //============================================================================
 // BASIC SYSTEM CONFIGURATION
@@ -65,13 +83,13 @@
 //`define PMEM_SIZE_54_KB
 //`define PMEM_SIZE_51_KB
 //`define PMEM_SIZE_48_KB
-//`define PMEM_SIZE_41_KB
+`define PMEM_SIZE_41_KB
 //`define PMEM_SIZE_32_KB
 //`define PMEM_SIZE_24_KB
 //`define PMEM_SIZE_16_KB
 //`define PMEM_SIZE_12_KB
 //`define PMEM_SIZE_8_KB
-`define PMEM_SIZE_4_KB
+//`define PMEM_SIZE_4_KB
 //`define PMEM_SIZE_2_KB
 //`define PMEM_SIZE_1_KB
 
@@ -83,17 +101,16 @@
 //`define DMEM_SIZE_32_KB
 //`define DMEM_SIZE_24_KB
 //`define DMEM_SIZE_16_KB
-//`define DMEM_SIZE_10_KB
+`define DMEM_SIZE_10_KB
 //`define DMEM_SIZE_8_KB
 //`define DMEM_SIZE_5_KB
 //`define DMEM_SIZE_4_KB
 //`define DMEM_SIZE_2p5_KB
 //`define DMEM_SIZE_2_KB
-`define DMEM_SIZE_1_KB
+//`define DMEM_SIZE_1_KB
 //`define DMEM_SIZE_512_B
 //`define DMEM_SIZE_256_B
 //`define DMEM_SIZE_128_B
-
 
 // Include/Exclude Hardware Multiplier
 `define MULTIPLIER
@@ -191,10 +208,10 @@
 //`define PER_SIZE_32_KB
 //`define PER_SIZE_16_KB
 //`define PER_SIZE_8_KB
-//`define PER_SIZE_4_KB
+`define PER_SIZE_4_KB
 //`define PER_SIZE_2_KB
 //`define PER_SIZE_1_KB
-`define PER_SIZE_512_B
+// `define PER_SIZE_512_B
 
 
 //-------------------------------------------------------
@@ -651,11 +668,17 @@
   `define PER_SIZE          `PER_CUSTOM_SIZE
 `endif
 
+`define BMEM_AWIDTH         9
+`define BMEM_SIZE        1024
+
 // Data Memory Base Adresses
 `define DMEM_BASE  `PER_SIZE
 
+`define BMEM_BASE `DMEM_BASE+`DMEM_SIZE
+
 // Program & Data Memory most significant address bit (for 16 bit words)
 `define PMEM_MSB   `PMEM_AWIDTH-1
+`define BMEM_MSB   `BMEM_AWIDTH-1
 `define DMEM_MSB   `DMEM_AWIDTH-1
 `define PER_MSB    `PER_AWIDTH-1
 
@@ -732,6 +755,8 @@
 `define I_EXT1      3'h3
 `define I_EXT2      3'h4
 `define I_IDLE      3'h5
+`define I_BOOTCODE  3'h6
+`define I_IRQ_PRE   3'h7
 
 // Execution state machine
 // (swapped E_IRQ_0 and E_IRQ_2 values to suppress glitch generation warning from lint tool)
@@ -749,6 +774,7 @@
 `define E_EXEC      4'hB
 `define E_JUMP      4'hC
 `define E_IDLE      4'hD
+`define E_DST_WD    4'hF
 
 // ALU control signals
 `define ALU_SRC_INV   0

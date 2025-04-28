@@ -1,0 +1,82 @@
+.include "pmem_defs.asm"
+
+    /*
+     * "Two IPE signatures, IPE Signature 1 (memory location 0FF88h) and IPE
+     * Signature 2 (memory location 0FF8Ah), reside in FRAM and can be used to
+     * control the initialization of the IP Encapsulation. Write 0xAAAA to IPE
+     * Signature 1 to trigger the evaluation of the IPE Signature 2 as the IPE
+     * structure pointer." [slau367p]
+     */
+.set IPE_SIG_VALID_SRC,      (0xFF88)
+.set IPE_STRUCT_POINTER_SRC, (0xFF8A)
+.set VALID_FLAG,             (0xAAAA)
+.set RESET_VECTOR,           (0xFFFE)
+
+    /*
+     * "On bootcode execution, a valid IPE Signature 1 triggers the transfer of
+     * the IPE Signature 2 (IPE structure pointer source) to a secured
+     * nonvolatile system data area (saved IPE structure pointer). This
+     * transfer only happens once if no previous secured IPE structure pointer
+     * exists." [slau367p]
+     */
+    .sect ".bootcode", "a"
+start_bootcode:
+    tst &saved_ptr
+    jnz check_struct
+
+transfer_if_valid_struct:
+    cmp #VALID_FLAG, &IPE_SIG_VALID_SRC
+    jnz end
+    mov &IPE_STRUCT_POINTER_SRC, &saved_ptr
+
+    /*
+     * "The bootcode performs a sequence to ensure the integrity of the IPE
+     * structure pointer. [...] The check code is calculated as an odd bit
+     * interleaved parity of the previous three words." [slau367p]
+     */
+check_struct:
+    mov &saved_ptr, r6
+    mov #0xFFFF, r14
+    xor @r6+, r14
+    xor @r6+, r14
+    xor @r6+, r14
+    cmp @r6, r14
+    jnz mass_erase_init
+
+    /*
+     * "By evaluating the saved IPE structure pointer, the bootcode can program
+     * the IP Encapsulation related register by transferring the values defined
+     * in the IP Encapsulation init structure to the corresponding fields in
+     * the MPU control registers." [slau367p]
+     */
+evaluate_struct:
+    mov -2(r6), &MPUIPSEGB1   ; store ipe start
+    mov -4(r6), &MPUIPSEGB2   ; store ipe end
+    mov -6(r6), &MPUIPC0      ; store ipe settings and lock bounds
+    jmp end
+
+    /*
+    * "An invalid IP Encapsulation init structure or a saved IPE structure pointer
+    * with an invalid target (not pointing to a valid IP Encapsulation init
+    * structure) causes an erase of all nonvolatile memory segments including the
+    * IP Encapsulation segments and the init structure during bootcode execution"
+    * [slau367p]
+    */
+mass_erase_init:
+    mov #PMEM_BASE, r6
+
+mass_erase_loop:
+    clr @r6
+    inc r6
+    jnc mass_erase_loop
+    clr &saved_ptr  ; clear saved pointer only after the device has been erased
+
+end:
+    br &RESET_VECTOR
+
+/* ************************************************************************* */
+    ; secured nonvolatile system data area
+saved_ptr:
+    .word 0
+
+.include "../src/ipe/bootcode-secure-irq.s43"
