@@ -1,7 +1,9 @@
 # openIPE: An Extensible Memory Isolation Framework for Microcontrollers
+[![Build Status](https://github.com/martonbognar/openipe/actions/workflows/ci.yaml/badge.svg)](https://github.com/martonbognar/openipe/actions/workflows/ci.yaml)
+ [![License](https://img.shields.io/badge/License-BSD_3--Clause-blue.svg)](https://opensource.org/licenses/BSD-3-Clause)
 
-This repository contains openIPE, a microcontroller design based on openMSP430, implementing Texas Instruments' Intellectual Property Encapsulation (IPE) memory isolation feature and featuring a firmware layer that can be used to implement various security-critical features.
-Aside from the source code of the microcontroller, the repository contains a unit test suite and uses a symbolic execution tool to validate properties of either IPE application or firmware code.
+This repository contains [openIPE](https://mici.hu/papers/bognar25openipe.pdf), a microcontroller design based on [openMSP430](https://github.com/olgirard/openmsp430), implementing Texas Instruments' [Intellectual Property Encapsulation (IPE)](https://www.ti.com/lit/an/slaa685/slaa685.pdf#page=9) memory isolation feature and featuring a firmware layer that can be used to implement various security-critical features.
+Aside from the source code of the microcontroller and applications, the repository contains a unit-test suite and uses a symbolic-execution tool to validate properties of either IPE application or firmware code.
 
 If you extend or improve upon our work, please consider submitting a pull request and cite openIPE as the following:
 
@@ -14,7 +16,7 @@ If you extend or improve upon our work, please consider submitting a pull reques
 }
 ```
 
-For a complete introduction to this work, we also strongly encourage reading our [conference paper](https://mici.hu/papers/bognar25openipe.pdf).
+For a complete introduction to this work, we also strongly encourage reading our [EuroS&P'25 paper](https://mici.hu/papers/bognar25openipe.pdf).
 
 ## Installation
 
@@ -107,3 +109,7 @@ The following is a non-exhaustive list of the most important directories and fil
 ## Support
 
 In case of suggestions or questions, please open a pull request or an issue!
+
+## License
+
+openIPE is based on the excellent [openMSP430](https://github.com/olgirard/openmsp430) core and is released under a BSD-3-Clause license.
