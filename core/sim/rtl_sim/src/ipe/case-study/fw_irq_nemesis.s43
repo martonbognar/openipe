@@ -1,7 +1,7 @@
 .include "pmem_defs.asm"
 
 .set __IPE_CUSTOM_IVT, 1
-.include "../src-c/framework/libipe/stubs/ipe-protected-irq.s"
+.include "../src-c/framework/libipe/stubs/ipe-protected-fw-irq.s"
 
     .global main
     .sect .data
@@ -115,30 +115,39 @@ untrusted_isr:
     mov #0, &TACTL
     mov #0xbeef, r15  ; signal ISR
     nop
+local_leg:
     reti
+
+trusted_cont:
+    ; set up fake stack for untrusted ISR
+    get_ipe_entry r15
+    push r15
+    push r2
+    mov &local_leg, r11
+
+    br &IRQ_NUM
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; IPE interrupt vector table
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-    .global __irq_trampoline
     .section .ipe_vectors, "a"
-.word ipe_irq_trampoline_0  ; Interrupt  0 (lowest priority)    <unused>
-.word ipe_irq_trampoline_1  ; Interrupt  1                      <unused>
-.word ipe_irq_trampoline_2  ; Interrupt  2                      <unused>
-.word ipe_irq_trampoline_3  ; Interrupt  3                      <unused>
-.word ipe_irq_trampoline_4  ; Interrupt  4                      <unused>
-.word ipe_irq_trampoline_5  ; Interrupt  5                      <unused>
-.word ipe_irq_trampoline_6  ; Interrupt  6                      <unused>
-.word ipe_irq_trampoline_7  ; Interrupt  7                      <unused>
-.word __irq_trampoline  ; Interrupt  8                      <unused>
-.word ipe_irq_trampoline_9  ; Interrupt  9                      <unused>
-.word ipe_irq_trampoline_10   ; Interrupt 10                      Watchdog timer
-.word ipe_irq_trampoline_11 ; Interrupt 11                      <unused>
-.word ipe_irq_trampoline_12 ; Interrupt 12                      <unused>
-.word ipe_irq_trampoline_13 ; Interrupt 13                      <unused>
-.word ipe_irq_trampoline_14 ; Interrupt 14                      NMI
-.word ipe_irq_trampoline_15 ; Interrupt 15 (highest priority)   RESET
+.word undef_irq  ; Interrupt  0 (lowest priority)    <unused>
+.word undef_irq  ; Interrupt  1                      <unused>
+.word undef_irq  ; Interrupt  2                      <unused>
+.word undef_irq  ; Interrupt  3                      <unused>
+.word undef_irq  ; Interrupt  4                      <unused>
+.word undef_irq  ; Interrupt  5                      <unused>
+.word undef_irq  ; Interrupt  6                      <unused>
+.word undef_irq  ; Interrupt  7                      <unused>
+.word trusted_cont  ; Interrupt  8                      <unused>
+.word undef_irq ; Interrupt  9                      <unused>
+.word undef_irq   ; Interrupt 10                      Watchdog timer
+.word undef_irq ; Interrupt 11                      <unused>
+.word undef_irq ; Interrupt 12                      <unused>
+.word undef_irq ; Interrupt 13                      <unused>
+.word undef_irq ; Interrupt 14                      NMI
+.word undef_irq ; Interrupt 15 (highest priority)   RESET
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;

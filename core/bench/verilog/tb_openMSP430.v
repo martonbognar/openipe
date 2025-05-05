@@ -384,7 +384,7 @@ ram #(`PMEM_MSB, `PMEM_SIZE) pmem_0 (
 // Bootcode Memory
 //----------------------------------
 
-ram #(`BMEM_MSB, `BMEM_SIZE) bmem_0 (
+ram #(`BMEM_MSB, `BMEM_TOTAL_SIZE) bmem_0 (
 
 // OUTPUTs
     .ram_dout          (bmem_dout),            // Bootcode Memory data output

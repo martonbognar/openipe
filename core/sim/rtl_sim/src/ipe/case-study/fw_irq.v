@@ -1,5 +1,3 @@
-`define LONG_TIMEOUT
-
 integer counter, handler;
 always @(posedge mclk or posedge puc_rst) begin
    if (puc_rst) counter <= 0;
@@ -47,7 +45,6 @@ initial
       $display("waiting for protected WDT IRQ -> IPE.. 1");
       @(posedge tb_openMSP430.dut.wdt_irq); // wdt interrupt
       $display("waiting for protected WDT IRQ -> IPE.. 1");
-      $display(r0);
       @(posedge tb_openMSP430.dut.ipe_bootcode_exec); // entering bootcode for handling
       $display("waiting for protected WDT IRQ -> IPE.. 1");
       @(posedge tb_openMSP430.dut.ipe_executing); // entering IPE for handling

@@ -880,7 +880,7 @@ io_mux #(8) io_mux_p2 (
 
 `ifdef INCLUDE_BMEM
 
-ram #(.ADDR_MSB(`BMEM_MSB), .MEM_SIZE(`BMEM_SIZE)) bmem_0 (
+ram #(.ADDR_MSB(`BMEM_MSB), .MEM_SIZE(`BMEM_TOTAL_SIZE)) bmem_0 (
 
 // OUTPUTs
     .ram_dout          (bmem_dout),            // Bootcode Memory data output

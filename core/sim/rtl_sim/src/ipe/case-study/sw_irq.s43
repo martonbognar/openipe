@@ -13,7 +13,7 @@
 .include "pmem_defs.asm"
 
 .set __IPE_CUSTOM_IVT, 1
-.include "../src-c/framework/libipe/stubs/ipe-protected-irq.s"
+.include "../src-c/framework/libipe/stubs/ipe-protected-sw-irq.s"
 
     .global main
     .sect .data
@@ -29,6 +29,7 @@ stack:
 main:
     mov #stack+50, r1
 
+    ; set up IPE boundaries
     mov #__ipe_start_shift, &MPUIPSEGB1
     mov #__ipe_end_shift, &MPUIPSEGB2
     mov #0x0060, &MPUIPC0
@@ -101,39 +102,16 @@ trampoline_to_ipe_10:
 trampoline_to_ipe_0:
 
     ; back up registers on the unprotected stack
-    push r4
-    push r5
-    push r6
-    push r7
-    push r8
-    push r9
-    push r10
-    push r11
-    push r12
-    push r13
-    push r14
-    push r15
+    push_all_regs
 
-    mov #-1, r7
+    mov #-1, r7             ; -1: indicate interrupt handling to IPE
     mov &irq_id_in_unp, r8  ; identifier of ISR in r8
     clr &irq_id_in_unp
     call #ipe_entry
 
     ; trusted ISR will return to untrusted trampoline to execute `reti`, which
-    ; will return here because of the "fake" stack entries
-untrusted_cont:
-    pop r15
-    pop r14
-    pop r13
-    pop r12
-    pop r11
-    pop r10
-    pop r9
-    pop r8
-    pop r7
-    pop r6
-    pop r5
-    pop r4
+    ; will return here
+    pop_all_regs
 
     ; return to originally interrupted instruction
     reti

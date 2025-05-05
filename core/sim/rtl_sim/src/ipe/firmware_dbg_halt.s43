@@ -1,0 +1,78 @@
+.include "pmem_defs.asm"
+
+    .global main
+    .sect .data
+stack:
+    .word 0, 0, 0, 0
+    .space 100
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Main test harness, unprotected code
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+    .sect .text
+main:
+    mov #stack+50, r1
+    mov #42, r14
+    mov #0xcafe, r12
+
+    ; delaying the execution for the debugger
+.rept 105
+    nop
+.endr
+    mov #43, r14
+    mov #0xbeef, r12
+
+    ; delaying the execution for the debugger
+.rept 60
+    nop
+.endr
+
+    eint
+    mov #0x4, &TACTL
+    mov #0x4, &TACCR0
+    mov #0x216, &TACTL
+
+    ; delaying the execution for the debugger
+.rept 8
+    nop
+.endr
+
+end_of_test:
+    nop
+    br #0xffff
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; TIMER_A handler in untrusted code
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+    .section .text
+    .global untrusted_isr
+
+untrusted_isr:
+    mov r12, r15  ; save value of r12 to check if debugger could overwrite it
+    mov #0, &TACTL
+    nop
+    reti
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Unprotected interrupt vector table
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+.section .vectors, "a"
+.word end_of_test    ; Interrupt  0 (lowest priority)    <unused>
+.word end_of_test    ; Interrupt  1                      <unused>
+.word end_of_test    ; Interrupt  2                      <unused>
+.word end_of_test    ; Interrupt  3                      <unused>
+.word end_of_test    ; Interrupt  4                      <unused>
+.word end_of_test    ; Interrupt  5                      <unused>
+.word end_of_test    ; Interrupt  6                      <unused>
+.word end_of_test    ; Interrupt  7                      <unused>
+.word untrusted_isr  ; Interrupt  8                      <unused>
+.word end_of_test    ; Interrupt  9                      <unused>
+.word end_of_test    ; Interrupt 10                      Watchdog timer
+.word end_of_test    ; Interrupt 11                      <unused>
+.word end_of_test    ; Interrupt 12                      <unused>
+.word end_of_test    ; Interrupt 13                      <unused>
+.word end_of_test    ; Interrupt 14                      NMI
+.word main           ; Interrupt 15 (highest priority)   RESET

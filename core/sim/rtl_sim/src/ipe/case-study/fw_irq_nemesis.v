@@ -1,5 +1,3 @@
-`define LONG_TIMEOUT
-
 reg [63:0] counter, start1, start2, isr1, isr2, end1, end2;
 
 always @(posedge mclk or posedge puc_rst)

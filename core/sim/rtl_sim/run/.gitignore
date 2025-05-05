@@ -11,3 +11,4 @@ pmem_defs.asme
 *.elf
 *.l43
 *.ihex
+log

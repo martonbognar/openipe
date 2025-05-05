@@ -211,7 +211,7 @@ assign ipe_executing = ipe_enabled & pc_in_ipe;
 
 function automatic address_in_bootcode (input [15:0] addr);
 begin
-  address_in_bootcode = addr < (`BMEM_BASE + `BMEM_SIZE) & addr >= `BMEM_BASE;
+  address_in_bootcode = addr < (`BMEM_BASE + `BMEM_PROT_SIZE) & addr >= `BMEM_BASE;
 end
 endfunction
 
@@ -222,8 +222,8 @@ assign bootcode_dma_violation = address_in_bootcode (dma_addr);
 assign bootcode_dbg_violation = address_in_bootcode (dbg_mem_addr);
 
 `ifdef SECURE_IRQ_FW
-wire bootcode_fe_violation_c = 0;
-//~fe_pc_in_bootcode & fe_pc_nxt_in_bootcode & ~ipe_bootcode_exec & ~irq_handling;
+wire fe_pc_nxt_in_firmware_ivt = fe_pc_nxt < (`BMEM_BASE + `BMEM_PROT_SIZE) & fe_pc_nxt >= (`BMEM_BASE + `BMEM_PROT_SIZE - 32);
+wire bootcode_fe_violation_c = ~fe_pc_in_bootcode & fe_pc_nxt_in_bootcode & ~ipe_bootcode_exec & ~fe_pc_nxt_in_firmware_ivt; // allow entry to bootcode through IVT
 `else
 wire bootcode_fe_violation_c = ~fe_pc_in_bootcode & fe_pc_nxt_in_bootcode & ~ipe_bootcode_exec;
 `endif

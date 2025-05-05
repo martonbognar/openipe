@@ -669,7 +669,8 @@
 `endif
 
 `define BMEM_AWIDTH         9
-`define BMEM_SIZE        1024
+`define BMEM_TOTAL_SIZE        1024
+`define BMEM_PROT_SIZE `BMEM_TOTAL_SIZE - 4  // last instruction reserved for trampoline
 
 // Data Memory Base Adresses
 `define DMEM_BASE  `PER_SIZE

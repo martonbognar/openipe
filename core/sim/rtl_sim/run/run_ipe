@@ -33,38 +33,59 @@ rm -rf $LOG_DIR/*
 mkdir -p $LOG_DIR
 
 export __IPE_SIM=1
-../bin/msp430sim ipe/1_noflag | tee $LOG_DIR/1_noflag.log
-../bin/msp430sim ipe/2_incorrect_pointer | tee $LOG_DIR/2_incorrect_pointer.log
-../bin/msp430sim ipe/3_correct_pointer | tee $LOG_DIR/3_correct_pointer.log
-../bin/msp430sim ipe/4_existing_pointer | tee $LOG_DIR/4_existing_pointer.log
-../bin/msp430sim ipe/5_locked_registers | tee $LOG_DIR/5_locked_registers.log
-../bin/msp430sim ipe/6_changing_registers | tee $LOG_DIR/6_changing_registers.log
-../bin/msp430sim ipe/7_sw_read | tee $LOG_DIR/7_sw_read.log
-../bin/msp430sim ipe/8_sw_write | tee $LOG_DIR/8_sw_write.log
-../bin/msp430sim ipe/9_sw_jump | tee $LOG_DIR/9_sw_jump.log
-../bin/msp430sim ipe/10_dbg_read | tee $LOG_DIR/10_dbg_read.log
-../bin/msp430sim ipe/11_dbg_write | tee $LOG_DIR/11_dbg_write.log
-../bin/msp430sim ipe/12_dbg_halt | tee $LOG_DIR/12_dbg_halt.log
 
+# IPE register behavior
+../bin/msp430sim ipe/ipe_noflag | tee $LOG_DIR/ipe_noflag.log
+../bin/msp430sim ipe/ipe_incorrect_pointer | tee $LOG_DIR/ipe_incorrect_pointer.log
+../bin/msp430sim ipe/ipe_correct_pointer | tee $LOG_DIR/ipe_correct_pointer.log
+../bin/msp430sim ipe/ipe_existing_pointer | tee $LOG_DIR/ipe_existing_pointer.log
+../bin/msp430sim ipe/ipe_locked_registers | tee $LOG_DIR/ipe_locked_registers.log
+../bin/msp430sim ipe/ipe_changing_registers | tee $LOG_DIR/ipe_changing_registers.log
+../bin/msp430sim ipe/ipe_inside_access | tee $LOG_DIR/ipe_inside_access.log
+
+# Protecting IPE region against software
+../bin/msp430sim ipe/ipe_sw_read | tee $LOG_DIR/ipe_sw_read.log
+../bin/msp430sim ipe/ipe_sw_write | tee $LOG_DIR/ipe_sw_write.log
+../bin/msp430sim ipe/ipe_sw_jump | tee $LOG_DIR/ipe_sw_jump.log
+
+# Protecting the firmware against software
+../bin/msp430sim ipe/firmware_sw_write | tee $LOG_DIR/firmware_sw_write.log
+../bin/msp430sim ipe/firmware_sw_jump | tee $LOG_DIR/firmware_sw_jump.log
+
+# Protecting IPE region against the debugger
+../bin/msp430sim ipe/ipe_dbg_read | tee $LOG_DIR/ipe_dbg_read.log
+../bin/msp430sim ipe/ipe_dbg_write | tee $LOG_DIR/ipe_dbg_write.log
+../bin/msp430sim ipe/ipe_dbg_halt | tee $LOG_DIR/ipe_dbg_halt.log
+
+# Protecting the firmware against the debugger
+../bin/msp430sim ipe/firmware_dbg_write | tee $LOG_DIR/firmware_dbg_write.log
+__IPE_IRQ_FW=1 ../bin/msp430sim ipe/firmware_dbg_halt -firmware ../src/ipe/bootcode-fw-irq.s43 | tee $LOG_DIR/firmware_dbg_halt.log
+
+# Preventing attacks
+../bin/msp430sim ipe/attack_ccc | tee $LOG_DIR/attack_ccc.log
+../bin/msp430sim ipe/attack_irq_exploit | tee $LOG_DIR/attack_irq_exploit.log
+../bin/msp430sim ipe/attack_malicious_reti | tee $LOG_DIR/attack_malicious_reti.log
+../bin/msp430sim ipe/attack_nmi_handler | tee $LOG_DIR/attack_nmi_handler.log
+__IPE_IRQ_FW=1 ../bin/msp430sim ipe/attack_firmware_rop -firmware ../src/ipe/bootcode-fw-irq.s43 | tee $LOG_DIR/attack_firmware_rop.log
+
+# Disable random DMA accesses for DMA tests
 unset __IPE_SIM
-../bin/msp430sim ipe/13_dma_read | tee $LOG_DIR/13_dma_read.log
-../bin/msp430sim ipe/14_dma_write | tee $LOG_DIR/14_dma_write.log
-../bin/msp430sim ipe/20_bootcode_dma_write | tee $LOG_DIR/20_bootcode_dma_write.log
+
+# Protecting the IPE region against DMA reads/writes
+../bin/msp430sim ipe/ipe_dma_read | tee $LOG_DIR/ipe_dma_read.log
+../bin/msp430sim ipe/ipe_dma_write | tee $LOG_DIR/ipe_dma_write.log
+
+# Protecting the firmware against DMA writes
+../bin/msp430sim ipe/firmware_dma_write | tee $LOG_DIR/firmware_dma_write.log
 
 export __IPE_SIM=1
-../bin/msp430sim ipe/15_inside_access | tee $LOG_DIR/15_inside_access.log
-../bin/msp430sim ipe/16_call_exploit | tee $LOG_DIR/16_call_exploit.log
-../bin/msp430sim ipe/17_irq_exploit | tee $LOG_DIR/17_irq_exploit.log
-../bin/msp430sim ipe/18_bootcode_sw_write | tee $LOG_DIR/18_bootcode_sw_write.log
-../bin/msp430sim ipe/19_bootcode_dbg_write | tee $LOG_DIR/19_bootcode_dbg_write.log
-../bin/msp430sim ipe/21_bootcode_sw_jump | tee $LOG_DIR/21_bootcode_sw_jump.log
-../bin/msp430sim ipe/23_malicious_reti | tee $LOG_DIR/23_malicious_reti.log
-../bin/msp430sim ipe/27_nmi_handler | tee $LOG_DIR/27_nmi_handler.log
 
-__IPE_IRQ_SW=1 ../bin/msp430sim ipe/use-case/24_secure_irq_sw | tee $LOG_DIR/24_secure_irq_sw.log
+# Use case: SW-based secure interrupts
+__IPE_IRQ_SW=1 ../bin/msp430sim ipe/case-study/sw_irq | tee $LOG_DIR/sw_irq.log
 
-__IPE_IRQ_FW=1 ../bin/msp430sim ipe/use-case/25_secure_irq_fw | tee $LOG_DIR/25_secure_irq_fw.log
-__IPE_IRQ_FW=1 ../bin/msp430sim ipe/use-case/26_nemesis_mitigation | tee $LOG_DIR/26_nemesis_mitigation.log
+# Use case: FW-based secure interrupts with Nemesis mitigation
+__IPE_IRQ_FW=1 ../bin/msp430sim -firmware ../src/ipe/bootcode-fw-irq.s43 ipe/case-study/fw_irq | tee $LOG_DIR/fw_irq.log
+__IPE_IRQ_FW=1 ../bin/msp430sim -firmware ../src/ipe/bootcode-fw-irq.s43 ipe/case-study/fw_irq_nemesis | tee $LOG_DIR/fw_irq_nemesis.log
 
 # Report regression results
 ../bin/parse_results $LOG_DIR
@@ -78,11 +99,12 @@ LOG_DIR=./log
 rm -rf $LOG_DIR/*
 mkdir -p $LOG_DIR
 
+# Running attacks without the hardware fixes (expected to succeed and thus cause violations)
 export __OMIT_IPE_FIXES=1
 export __OMIT_SP_SWITCHING=1
-../bin/msp430sim ipe/9_sw_jump | tee $LOG_DIR/9_sw_jump.log
-../bin/msp430sim ipe/16_call_exploit | tee $LOG_DIR/16_call_exploit.log
-../bin/msp430sim ipe/17_irq_exploit | tee $LOG_DIR/17_irq_exploit.log
+../bin/msp430sim ipe/ipe_sw_jump | tee $LOG_DIR/ipe_sw_jump.log
+../bin/msp430sim ipe/attack_ccc | tee $LOG_DIR/attack_ccc.log
+../bin/msp430sim ipe/attack_irq_exploit | tee $LOG_DIR/attack_irq_exploit.log
 
 # Report regression results
 ../bin/parse_results $LOG_DIR
@@ -90,4 +112,3 @@ export __OMIT_SP_SWITCHING=1
 if [ $? -ne 3 ] || [ $FIRST_RES -ne 0 ]; then
     exit 1
 fi
-

@@ -1,8 +1,12 @@
+<center>
+<img src='doc/logo.png' style='max-height: 15vh; max-width: 100vw'>
+</center>
+
+---
+
 # openIPE: An Extensible Memory Isolation Framework for Microcontrollers
 [![Build Status](https://github.com/martonbognar/openipe/actions/workflows/ci.yaml/badge.svg)](https://github.com/martonbognar/openipe/actions/workflows/ci.yaml)
  [![License](https://img.shields.io/badge/License-BSD_3--Clause-blue.svg)](https://opensource.org/licenses/BSD-3-Clause)
-
-![logo](doc/logo.svg)
 
 This repository contains [openIPE](https://mici.hu/papers/bognar25openipe.pdf), a microcontroller design based on [openMSP430](https://github.com/olgirard/openmsp430), implementing Texas Instruments' [Intellectual Property Encapsulation (IPE)](https://www.ti.com/lit/an/slaa685/slaa685.pdf#page=9) memory isolation feature and featuring a firmware layer that can be used to implement various security-critical features.
 Aside from the source code of the microcontroller and applications, the repository contains a unit-test suite and uses a symbolic-execution tool to validate properties of either IPE application or firmware code.
@@ -107,6 +111,14 @@ The following is a non-exhaustive list of the most important directories and fil
 - [`core/sim/rtl_sim/src-c/framework`](core/sim/rtl_sim/src-c/framework): our software framework adapted from IPE Exposure.
 - [`core/sim/rtl_sim/src-c/ipe-hello`](core/sim/rtl_sim/src-c/ipe-hello): IPE hello world project in C.
 - [`core/sim/rtl_sim/src-c/ipe-hmac`](core/sim/rtl_sim/src-c/ipe-hmac): software attestation case study.
+
+
+### Making firmware modifications
+
+One of the most important features of openIPE is the extensible firmware.
+You can find the firmware implementing the IPE bootcode in [`core/sim/rtl_sim/src/ipe/bootcode.s43`](core/sim/rtl_sim/src/ipe/bootcode.s43), and the version extended to implement the FW-IRQ secure interrupt scheme in [`core/sim/rtl_sim/src/ipe/bootcode-fw-irq.s43`](core/sim/rtl_sim/src/ipe/bootcode-fw-irq.s43).
+In the [IPE unit test file](core/sim/rtl_sim/run/run_ipe) we added additional options to switch between different firmware implementations.
+Finally, the [openIPE linker script](core/sim/rtl_sim/bin/ipe_linker.x) and the [assembly macros](core/sim/rtl_sim/bin/ipe_macros.asm) contain useful options for firmware modifications.
 
 ## Support
 

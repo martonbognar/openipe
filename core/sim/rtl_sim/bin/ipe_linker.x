@@ -6,8 +6,9 @@ OUTPUT_ARCH("msp430")
 MEMORY
 {
   data      (rwx)   : ORIGIN = PER_SIZE,  LENGTH = DMEM_SIZE
-  bootcode  (rwx)   : ORIGIN = BMEM_BASE, LENGTH = BMEM_SIZE
-  bootcode_ivt (rw) : ORIGIN = BMEM_IVT_BASE, LENGTH = 0x22
+  bootcode  (rwx)   : ORIGIN = BMEM_BASE, LENGTH = BMEM_TOTAL_SIZE
+  bootcode_ivt (rw) : ORIGIN = BMEM_IVT_BASE, LENGTH = 0x20
+  fw_trampoline (rwx) : ORIGIN = BMEM_TRAMPOLINE_BASE, LENGTH = 0x4
   text      (rx)    : ORIGIN = PMEM_BASE, LENGTH = PMEM_SIZE
   ipe_seg   (rwx)   : ORIGIN = 0x8000,    LENGTH = 0x6400
   ipe_padding (rw) :  ORIGIN = 0xe3de,    LENGTH = 0x2
@@ -16,7 +17,6 @@ MEMORY
   vectors64 (rw)    : ORIGIN = 0xff80,    LENGTH = 0x40
   vectors32 (rw)    : ORIGIN = 0xffc0,    LENGTH = 0x20
   vectors   (rw)    : ORIGIN = 0xffe0,    LENGTH = 0x20
-  irq_trampoline (rwx) : ORIGIN = 0xff90, LENGTH = 0x20
   irq_num (rwx)     : ORIGIN = 0xffb0,    LENGTH = 0x2
 }
 SECTIONS
@@ -160,11 +160,11 @@ SECTIONS
      _bootcode_ivt_end = . ;
   }  > bootcode_ivt
 
-  .irq_trampoline :
+  .fw_trampoline :
   {
-    PROVIDE(__irq_trampoline = .);
-    *(.irq_trampoline)
-  } > irq_trampoline
+    PROVIDE(__fw_trampoline = .);
+    *(.fw_trampoline)
+  } > fw_trampoline
 
   .irq_num :
   {

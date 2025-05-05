@@ -384,7 +384,7 @@ always @(posedge mclk_irq_num or posedge puc_rst)
 `else
   `ifdef SECURE_IRQ_FW
     // route interrupt to dedicated firmware jump table
-    wire [15:0] bootcode_end = (`BMEM_BASE + `BMEM_SIZE - 32);
+    wire [15:0] bootcode_end = (`BMEM_BASE + `BMEM_PROT_SIZE - 32);
     wire [6:0] irq_idx       = irq_num - 48;
     wire [15:0] irq_addr     = bootcode_end + {irq_idx, 1'b0};
   `else

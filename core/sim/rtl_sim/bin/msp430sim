@@ -39,6 +39,7 @@
 ###############################################################################
 testname=""
 seed=""
+firmware="../src/ipe/bootcode.s43" # path to firmware
 dma_verif="DMA_VERIF"
 while [[ $# > 0 ]]; do
     key="$1"
@@ -46,6 +47,10 @@ while [[ $# > 0 ]]; do
     case $key in
 	-seed)
 	    seed="$1"
+	    shift
+	    ;;
+	-firmware)
+	    firmware="$1"
 	    shift
 	    ;;
 	-no_dma)
@@ -181,13 +186,10 @@ source   pmem.sh
 echo "Compile, link & generate IHEX file (Program Memory: $pmemsize B, Data Memory: $dmemsize B, Peripheral Space: $persize B)..."
 ../bin/asm2ihex.sh  pmem pmem.s43 $linkfile $headfile $pmemsize $dmemsize $persize $bmemsize
 
-# Compile bootcode firmware
-bootcode="../src/ipe/bootcode.s43"
-
 echo "Compile, link & generate bootcode IHEX file (Bootcode Memory: $bmemsize B)"
 echo ""
-echo "\$ $MSPGCC_PFX-as      -alsm $bootcode -o bootcode.o > bmem.l43"
-$MSPGCC_PFX-as      -alsm $bootcode -o bootcode.o    > bmem.l43
+echo "\$ $MSPGCC_PFX-as      -alsm $firmware -o bootcode.o > bmem.l43"
+$MSPGCC_PFX-as      -alsm $firmware -o bootcode.o    > bmem.l43
 echo "\$ $MSPGCC_PFX-ld      -T ./pmem.x bootcode.o -o bmem.elf"
 $MSPGCC_PFX-ld      -T ./pmem.x   bootcode.o    -o bmem.elf
 echo "\$ $MSPGCC_PFX-objcopy -O ihex bmem.elf bmem.ihex"

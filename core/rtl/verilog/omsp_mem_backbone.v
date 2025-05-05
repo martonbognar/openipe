@@ -278,7 +278,9 @@ wire        [15:0] dmem_din      =   ext_dmem_en ?  ext_mem_dout               :
 //------------------------------------------
 // BOOTCODE-MEMORY Interface
 //------------------------------------------
-parameter          BMEM_END      = `BMEM_BASE+`BMEM_SIZE;
+parameter          BMEM_END      = `BMEM_BASE+`BMEM_TOTAL_SIZE;
+
+wire [15:0] bmem_end_p = BMEM_END;
 
 // Execution unit access
 wire               eu_bmem_sel   = (eu_mab>=(`BMEM_BASE>>1)) &
@@ -381,7 +383,12 @@ wire [15:0] pbmem_dout  = fe_violation_buf ? 16'h3FFF     :
 wire eu_pbmem_en = ipe_bootcode_exec ? eu_bmem_en : eu_pmem_en;
 assign pmem_writing  = eu_pbmem_en & |eu_mb_wr;
 
-// Detect whenever the data should be backuped and restored
+reg fe_bmem_en_dly;
+always @(posedge mclk or posedge puc_rst)
+  if (puc_rst) fe_bmem_en_dly <=  1'b0;
+  else         fe_bmem_en_dly <=  fe_bmem_en;
+
+// Detect whenever the data should be backed up and restored
 reg         fe_pbmem_en_dly;
 always @(posedge mclk or posedge puc_rst)
   if (puc_rst) fe_pbmem_en_dly <=  1'b0;
@@ -417,12 +424,9 @@ always @(posedge mclk or posedge puc_rst)
   else if (fe_pbmem_restore) pbmem_dout_bckup_sel <=  1'b0;
 
 assign fe_mdb_in = pbmem_dout_bckup_sel ? pbmem_dout_bckup :
-                   (fe_bmem_en & ~bootcode_fe_violation) ? bmem_dout :
+                   (fe_bmem_en_dly & ~bootcode_fe_violation) ? bmem_dout :
                    ~ipe_fe_violation ? pmem_dout :
                    16'h3FFF;
-//assign fe_mdb_in = pmem_dout_bckup_sel ? pmem_dout_bckup :
-//                   (bmem_dout_bckup_sel & ~fe_pmem_en) ? bmem_dout_bckup :
-//                   fe_bmem_en ? bmem_dout : pmem_dout;
 
 //------------------------------------------
 // Execution-Unit data Mux

@@ -265,7 +265,5 @@
 .set    PMEM_EDE_LENGTH, PMEM_EDE_SIZE
 
 .set    BMEM_BASE,       BMEM_BASE_VAL
-.set    BMEM_LENGTH,     BMEM_SIZE
 
-.set    IRQ_TRAMPOLINE,  0xff90
 .set    IRQ_NUM,         0xffb0
