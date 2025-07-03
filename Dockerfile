@@ -34,4 +34,28 @@ WORKDIR /openipe
 COPY *.sh .
 RUN chmod +x *.sh
 
+################################################################################
+# Display a welcome message for interactive sessions
+################################################################################
+
+RUN echo '[ ! -z "$TERM" -a -r /etc/motd ] && cat /etc/motd' \
+	>> /etc/bash.bashrc ; echo "\
+                                                    @@   @@@@@@@    @@@@@@@@@@ \n\
+                                                    @@   @      @@  @          \n\
+       @@@@@       @@@@@       @@@@@    @  @@@@     @@   @       @  @          \n\
+     @@   @ @@   @@     @@   @@     @@  @@     @@   @@   @      @@  @@@@@@@    \n\
+    @@@@ @    @ @@       @@  @       @  @       @@  @@   @@@@@@@    @          \n\
+    @@   @ @@ @ @@       @@  @          @       @@  @@   @          @          \n\
+  @@  @ @@  @@  @@@     @@   @@         @       @@  @@   @          @          \n\
+   @@@   @@@    @@  @@@@       @@@@@    @       @@  @@   @          @@@@@@@@@@ \n\
+@   @           @@                                                             \n\
+  @             @@                                                             \n\
+\n\
+\n\
+`lsb_release -d`\n\n\
+To get started, see <https://github.com/martonbognar/openipe>,\n\
+or have a look at the example programs under <core/sim/rtl_sim/src-c/ipe-hello/>.\n\
+\n"\
+> /etc/motd
+
 CMD /bin/bash
