@@ -7,7 +7,7 @@
 # openIPE: An Extensible Memory Isolation Framework for Microcontrollers
 [![Build Status](https://github.com/martonbognar/openipe/actions/workflows/ci.yaml/badge.svg)](https://github.com/martonbognar/openipe/actions/workflows/ci.yaml)
  [![License](https://img.shields.io/badge/License-BSD_3--Clause-blue.svg)](https://opensource.org/licenses/BSD-3-Clause)
- [![Docker container size](https://ghcr-badge.egpl.dev/martongbognar/openipe/size?color=%2344cc11&tag=latest&label=Docker+container+size)](https://ghcr.io/martonbognar/openipe)
+ [![Docker container size](https://ghcr-badge.egpl.dev/martonbognar/openipe/size?color=%2344cc11&tag=latest&label=Docker+container+size)](https://ghcr.io/martonbognar/openipe)
 
 This repository contains [openIPE](https://mici.hu/papers/bognar25openipe.pdf), a microcontroller design based on [openMSP430](https://github.com/olgirard/openmsp430), implementing Texas Instruments' [Intellectual Property Encapsulation (IPE)](https://www.ti.com/lit/an/slaa685/slaa685.pdf#page=9) memory isolation feature and featuring a firmware layer that can be used to implement various security-critical features.
 Aside from the source code of the microcontroller and applications, the repository contains a unit-test suite and uses a symbolic-execution tool to validate properties of either IPE application or firmware code.
@@ -31,7 +31,7 @@ We recommend using [Docker](https://www.docker.com/).
 This latest container image containing all dependencies and setup code can be retrieved as follows:
 
 ```
-$ docker pull ghcr.io/martongbognar/openipe:latest
+$ docker pull ghcr.io/martonbognar/openipe:latest
 ```
 
 Once the image is pulled, you can start a new instance with the `core` directory mounted as a volume.
