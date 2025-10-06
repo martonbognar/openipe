@@ -99,7 +99,7 @@ The following scripts run the [Pandora](https://github.com/pandora-tee/pandora) 
 These scripts operate on the `pmem.elf` and `bmem.elf` binaries located in the `core/sim/rtl_sim/run` directory, i.e., they will analyze the last program that was run on the simulator.
 For example, you can run `./framework_hello.sh` first to generate the simple hello world IPE application binary.
 
-The script `./sybolic_ipe.sh` performs the security validation if the binary contains a valid IPE region, while `./symbolic_firmware.sh` will validate the firmware code.
+The script `./symbolic_ipe.sh` performs the security validation if the binary contains a valid IPE region, while `./symbolic_firmware.sh` will validate the firmware code.
 
 ## Extending the codebase
 
