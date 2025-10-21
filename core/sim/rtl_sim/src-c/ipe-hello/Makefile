@@ -1,5 +1,5 @@
 NAME            = ipe-hello
-OBJECTS         = main.o output/generated_table.o output/generated_stubs.o
+OBJECTS         = generated_main.o output/generated_table.o output/generated_stubs.o
 
 AS              = msp430-as
 CC              = msp430-gcc
