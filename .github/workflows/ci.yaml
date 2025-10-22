@@ -43,7 +43,14 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        test-script: ['./regression_tests.sh', './isolation_tests.sh', './framework_hello.sh', './framework_attestation.sh', './framework_hello.sh ; ./symbolic_ipe.sh', './framework_hello.sh ; ./symbolic_firmware.sh']
+        test-script: [
+          './tests/regression_tests.sh',
+          './tests/isolation_tests.sh',
+          './tests/framework_hello.sh',
+          './tests/framework_attestation.sh',
+          './tests/framework_hello.sh ; ./tests/symbolic_ipe.sh',
+          './tests/framework_hello.sh ; ./tests/symbolic_firmware.sh'
+        ]
     steps:
       - name: Check out repository
         uses: actions/checkout@v2
@@ -62,7 +69,6 @@ jobs:
         with:
           image: openipe:latest
           options: -v ${{ github.workspace }}/core:/openipe/core
-          path: /openipe/scripts
           run: ${{ matrix.test-script }}
 
   push-image:
