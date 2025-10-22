@@ -52,12 +52,12 @@ These scripts can be used as a starting point for running more advanced examples
 
 #### Regression tests
 
-Run `./regression_tests.sh` to execute the original regression tests of openMSP430.
+Run `./scripts/regression_tests.sh` to execute the original regression tests of openMSP430.
 This test will finish with an overview table and a report of the number of successful and unsuccessful tests.
 
 #### Isolation test suite
 
-Run `./isolation_tests.sh` to execute the unit tests we added to validate the security guarantees added by our extensions and the interrupt case study.
+Run `./scripts/isolation_tests.sh` to execute the unit tests we added to validate the security guarantees added by our extensions and the interrupt case study.
 This script performs two steps:
 First, it runs the tests as expected, where it is validated that no leakage occurs.
 Then, it runs some tests without the hardware fixes proposed in IPE Exposure to validate that this re-enables some vulnerabilities.
@@ -66,7 +66,7 @@ During the execution of the case study tests (#24-26), overhead measurements for
 
 
 ```shell
-$ ./isolation_tests.sh
+$ ./scripts/isolation_tests.sh
 ...
 #===================================================================#
 #                            SUMMARY REPORT                         #
@@ -86,18 +86,20 @@ $ ./isolation_tests.sh
 
 ### Software development framework workflow
 
-The example `./framework_hello.sh` demonstrates how to apply our mitigation framework to C projects and run them on openIPE.
+The example `./scripts/framework_hello.sh` demonstrates how to apply our mitigation framework to C projects and run them on openIPE.
 This script runs the framework on a simple hello world C IPE project then executes it in the simulator, obtaining some performance measurements.
 
 ### Attestation case study
 
-The script `./framework_attestation.sh` runs the framework on the attestation code adapted from VRASED and runs it on openIPE, reporting on the total number of cycles elapsed.
+The script `./scripts/framework_attestation.sh` runs the framework on the attestation code adapted from VRASED and runs it on openIPE, reporting on the total number of cycles elapsed.
 
 ### Symbolic validation
 
 The following scripts run the [Pandora](https://github.com/pandora-tee/pandora) symbolic execution tool on openIPE binaries.
 These scripts operate on the `pmem.elf` and `bmem.elf` binaries located in the `core/sim/rtl_sim/run` directory, i.e., they will analyze the last program that was run on the simulator.
-For example, you can run `./framework_hello.sh` first to generate the simple hello world IPE application binary.
+For example, you can run `./scripts/framework_hello.sh` first to generate the simple hello world IPE application binary.
+
+The script `./scripts/symbolic_ipe.sh` performs the security validation if the binary contains a valid IPE region, while `./scripts/symbolic_firmware.sh` will validate the firmware code.
 
 The script `./symbolic_ipe.sh` performs the security validation if the binary contains a valid IPE region, while `./symbolic_firmware.sh` will validate the firmware code.
 
