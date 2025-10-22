@@ -27,6 +27,7 @@ For a complete introduction to this work, we also strongly encourage reading our
 
 ## Installation
 
+### Docker setup
 We recommend using [Docker](https://www.docker.com/).
 This latest container image containing all dependencies and setup code can be retrieved as follows:
 
@@ -39,8 +40,21 @@ This will allow you to edit the source files on your own machine and execute scr
 
 ```shell
 $ docker run -it -v ./core:/openipe/core openipe:latest /bin/bash
+
+```
+### Docker compose setup
+You can also use [Docker Compose](https://docs.docker.com/compose/) to set up the development environment.
+See the provided `docker-compose.yaml` file for an example configuration.
+You can start and a new container with the following command:
+```shell
+$ docker compose up -d
+```
+You can then access the container's shell with:
+```shell
+$ docker exec -it openipe /bin/bash
 ```
 
+### Manual setup
 Alternatively, you can follow the steps in the [Dockerfile](Dockerfile) to set up the dependencies on your own machine.
 
 ## Basic functionality
@@ -101,7 +115,7 @@ For example, you can run `./scripts/framework_hello.sh` first to generate the si
 
 The script `./scripts/symbolic_ipe.sh` performs the security validation if the binary contains a valid IPE region, while `./scripts/symbolic_firmware.sh` will validate the firmware code.
 
-The script `./symbolic_ipe.sh` performs the security validation if the binary contains a valid IPE region, while `./symbolic_firmware.sh` will validate the firmware code.
+The pandora reports will be stored in the `logs/symbolic_ipe/` and `logs/symbolic_firmware/` directories, respectively. If you use the docker compose or manually map the volumes, you will be able to access these logs on your host machine and open them in a browser.
 
 ## Extending the codebase
 
