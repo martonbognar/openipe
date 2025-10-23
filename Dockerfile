@@ -31,8 +31,8 @@ RUN python3 -m pip install -r requirements.txt && cd angr-platforms && python3 -
 ################################################################################
 
 WORKDIR /openipe
-COPY *.sh .
-RUN chmod +x *.sh
+COPY scripts/* ./scripts/
+RUN chmod +x scripts/*.sh
 
 ################################################################################
 # Display a welcome message for interactive sessions
