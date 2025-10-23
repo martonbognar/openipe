@@ -1,5 +1,5 @@
 NAME            = ipe-hmac
-OBJECTS         = untrusted.o ipe.o output/generated_table.o output/generated_stubs.o
+OBJECTS         = untrusted.o generated_ipe.o output/generated_table.o output/generated_stubs.o
 
 CC              = msp430-gcc
 AS              = msp430-as
