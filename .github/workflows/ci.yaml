@@ -97,3 +97,14 @@ jobs:
         run: |
           docker tag openipe:latest ghcr.io/${{ github.repository_owner }}/openipe:latest
           docker push ghcr.io/${{ github.repository_owner }}/openipe:latest
+
+  check-docker-compose:
+    name: Check Docker Compose file
+    runs-on: ubuntu-latest
+    needs: push-image
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v2
+      
+      - name: Run a simple tests inside the container
+        run: docker compose run openipe ./scripts/framework_hello.sh
