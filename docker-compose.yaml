@@ -1,0 +1,13 @@
+services:
+  openipe:
+    image: ghcr.io/martonbognar/openipe
+    container_name: openipe
+    restart: "no"
+    stdin_open: true
+    tty: true
+    working_dir: /openipe
+    volumes:
+      - ./core:/openipe/core
+      - ./logs:/openipe/logs
+      - ./scripts:/openipe/scripts
+    command: "/bin/bash"
