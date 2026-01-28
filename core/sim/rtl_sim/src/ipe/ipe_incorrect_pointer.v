@@ -1,3 +1,5 @@
+`define PMEM_BASE  ((16'hffff-`PMEM_SIZE+1))
+
 initial
    begin
       $display("===============================================");
@@ -11,9 +13,11 @@ initial
       $display("Waiting for mass erase loop...");
 
       /* ----------------------  END OF TEST --------------- */
-      @(dut.execution_unit_0.mb_wr && dut.execution_unit_0.mab == 0);  // TODO: what does this check?
-      @(dut.execution_unit_0.mb_wr && dut.execution_unit_0.mab == 2);
+      @(dut.execution_unit_0.mb_wr && dut.execution_unit_0.mab == `PMEM_BASE);
+      repeat(2) @(posedge mclk);
+      @(dut.execution_unit_0.mb_wr && dut.execution_unit_0.mab == `PMEM_BASE+2);
 
+      repeat(2) @(posedge mclk);
       stimulus_done = 1;
       stimulus_kill = 1;
    end

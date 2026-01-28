@@ -72,7 +72,7 @@ mass_erase_init:
 
 mass_erase_loop:
     clr @r6
-    inc r6
+    add #2, r6
     jnc mass_erase_loop
     clr &saved_ptr  ; clear saved pointer only after the device has been erased
 
