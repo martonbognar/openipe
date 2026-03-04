@@ -31,7 +31,7 @@ initial
       @(r15 == 16'hbeef);
       isr2 <= counter;
       @(r15 == 16'hdead);
-      end2 <= counter;
+      end2 = counter;
 
       if (isr1 - start1 != isr2 - start2)
          tb_error("Delay to ISR differs!");
