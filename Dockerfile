@@ -58,4 +58,4 @@ or have a look at the example programs under <core/sim/rtl_sim/src-c/ipe-hello/>
 \n"\
 > /etc/motd
 
-CMD /bin/bash
+CMD ["/bin/bash"]
