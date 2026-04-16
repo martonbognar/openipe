@@ -123,6 +123,9 @@ irq_dispatch:
     br r8
 
 irq_dispatch_ret:
+    cmp #1, r9
+    jeq ocall_ret
+    
     clr r6
     br #ecall_ret
 

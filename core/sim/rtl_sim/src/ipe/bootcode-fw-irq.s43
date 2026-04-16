@@ -201,6 +201,8 @@ from_ipe_to_ipe:
     mov #-1, r7
     mov &IRQ_NUM, r8  ; identifier of ISR in r8
 
+    mov #1, r9 ; reach ocall_ret
+
     get_ipe_entry r15
     cmp #PMEM_BASE, r15
     jlo invalid_isr_address
@@ -247,6 +249,8 @@ from_untrusted_to_ipe:
 
     mov #-1, r7
     mov &IRQ_NUM, r8  ; identifier of ISR in r8
+
+    mov #0, r9 ; use untrusted stack to reach trampoline
 
     mov r8, r15
     add r15, r15
