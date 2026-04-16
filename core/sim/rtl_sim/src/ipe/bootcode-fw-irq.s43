@@ -189,7 +189,7 @@ nemesis_slide:
 
     ; check if handler is also in IPE
     mov &IRQ_NUM, r15
-    tst ivt_jump_in_ipe(r15)
+    tst.b ivt_jump_in_ipe(r15)
 
     jz from_ipe_to_untrusted
 
@@ -236,7 +236,7 @@ from_untrusted:
     ; check if handler is also in untrusted
     push r15
     mov &IRQ_NUM, r15
-    tst ivt_jump_in_ipe(r15)
+    tst.b ivt_jump_in_ipe(r15)
     pop r15
 
     jz from_untrusted_to_untrusted
