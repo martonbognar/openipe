@@ -9,7 +9,7 @@ import colorama
 
 import logging
 from logging import debug, info, warning, error
-logging.basicConfig(format=f'%(levelname)s: %(message)s',level=logging.DEBUG)
+logging.basicConfig(format=f'%(levelname)s: %(message)s',level=logging.INFO)
 
 def rm(*files):
     for f in files:
@@ -36,13 +36,12 @@ def get_tmp_dir():
     return tmp
 
 
-#@atexit.register
-#def cleanup():
-#    if tmp_files:
-#        info('Cleaning up temporary files: ' + ', '.join(tmp_files))
-#        rm(*tmp_files)
-#        del tmp_files[:]
-
+@atexit.register
+def cleanup():
+    if tmp_files:
+        info('Cleaning up temporary files: ' + ', '.join(tmp_files))
+        rm(*tmp_files)
+        del tmp_files[:]
 
 def call_prog(prog, arguments=[], get_output=False):
     cmd = [prog] + arguments

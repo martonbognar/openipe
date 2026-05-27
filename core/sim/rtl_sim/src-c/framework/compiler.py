@@ -4,6 +4,7 @@ from common import *
 import copy
 import os
 import sys
+import atexit
 
 from pycparser import c_ast
 from pycparserext import ext_c_parser
@@ -130,6 +131,8 @@ class OcallCollector(c_ast.NodeVisitor):
         self.ocall_detected = False
 
     def visit_FuncCall(self, node):
+        if (not hasattr(node.name, 'name')):
+            return
         funcName = node.name.name
         # works because function declaration must proceed function call
         if funcName not in self.ipe_functions and funcName not in self.inline_functions and "__" not in funcName:
@@ -175,16 +178,14 @@ class OcallStubCreator(c_ast.NodeVisitor):
 if __name__ == "__main__":
     debug(f"openipe-cc {sys.argv[1:]}")
 
-    LIBIPE = os.path.abspath(os.path.dirname(sys.argv[0])) + '/libipe/'
-
     # Run the input C file through the preprocessor
-    tmp = get_tmp_dir()
-    pp_file = next(
-        os.path.join(tmp, os.path.basename(x).replace(".o", ".pp"))
+    file_name = next(
+        os.path.splitext(os.path.basename(x))[0]
         for x in sys.argv
         if x.endswith(".o")
     )
-
+    pp_file = get_tmp(suffix='.pp')
+    
     pp_argv = [
         "-E" if x == "-c"
         else pp_file if x.endswith(".o")
@@ -219,37 +220,28 @@ if __name__ == "__main__":
     ocall_stub_creator = OcallStubCreator(generated_header, ocall_collector.ocall_functions)
     ocall_stub_creator.visit(original_ast)
 
-    # write generated table file
-    with open(LIBIPE + '/templates/generated_table.s') as file:
-        table_template = Template(file.read())
-        table_obj = {
-            'max_entry_index': ipe_collector.index - 1,
-            'entry_functions': ipe_collector.entry_functions,
-        }
-        with open("output/generated_table.s", "w") as target_file:
-            target_file.write(table_template.render(table_obj))
-
-    # write generated stubs
-    with open(LIBIPE + '/templates/generated_stubs.s') as file:
-        stubs_template = Template(file.read())
-        stubs_obj = {
-            'stubs_to_unprotected': ocall_stub_creator.stubs,
-            'stubs_to_protected': ipe_collector.entry_functions,
-        }
-        with open("output/generated_stubs.s", "w") as target_file:
-            target_file.write(stubs_template.render(stubs_obj))
-
-    # write C translation result to new file
-    with open('output/generated_ipe_header.h', "w") as newFile:
+    # compile converted AST in new C file
+    out_c = get_tmp(suffix='.c')
+    with open(out_c, 'w') as newFile:
         newFile.write(GnuCGenerator().visit(generated_header))
+        for line in GnuCGenerator().visit(original_ast).splitlines():
+            if "asm" in line:
+                newFile.write(line + ";\n")
+            else:
+                newFile.write(line + "\n")
+    call_prog("msp430-gcc", ['-c', out_c, '-o', f'{file_name}.o'])
 
-    newFile = open('output/generated.c', "w")
-    for line in GnuCGenerator().visit(replacement_functions).splitlines():
-        if "asm" in line:
-            newFile.write(line + ";\n")
-        else:
-            newFile.write(line + "\n")
+    # Store name + bitmap in .o file for later processing by linker
+    # NOTE: the `--add-symbol` option is only available for GNU binutils > msp430-gcc;
+    # thus rely on msp430-elf-objcopy from the TI GCC port.
+    for ecall in ipe_collector.entry_functions:
+        call_prog('msp430-elf-objcopy', ['--add-symbol',
+                 f'__ipe_ecall_{ecall["external_name"]}={ecall["bitmap"]},weak', f'{file_name}.o'])
+    for ocall in ocall_stub_creator.stubs:
+        call_prog('msp430-elf-objcopy', ['--add-symbol',
+                 f'__ipe_ocall_{ocall["function"]}={hex(int(ocall["bitmap"],2))},weak', f'{file_name}.o'])
 
-    # clean up
+@atexit.register
+def cleanup():
     rm("./lextab.py")
     rm("./yacctab.py")
