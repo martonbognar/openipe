@@ -223,6 +223,7 @@ if __name__ == "__main__":
 
     # compile converted AST in new C file
     out_c = get_tmp(suffix='.c')
+    #out_c = "temp.c"
     with open(out_c, 'w') as newFile:
         newFile.write(GnuCGenerator().visit(generated_header))
         for line in GnuCGenerator().visit(original_ast).splitlines():
@@ -230,7 +231,12 @@ if __name__ == "__main__":
                 newFile.write(line + ";\n")
             else:
                 newFile.write(line + "\n")
-    call_prog("msp430-gcc", ['-c', out_c, '-o', f'{file_name}.o'])
+
+    new_args = sys.argv[1:].copy()
+    new_args[new_args.index('-c') + 1] = out_c
+    new_args[new_args.index('-o') + 1] = f'{file_name}.o'
+
+    call_prog("msp430-gcc", new_args)
 
     # Store name + bitmap in .o file for later processing by linker
     # NOTE: the `--add-symbol` option is only available for GNU binutils > msp430-gcc;

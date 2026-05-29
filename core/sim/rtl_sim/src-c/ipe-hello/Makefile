@@ -1,15 +1,22 @@
-NAME            = ipe-hello
-OBJECTS         = generated_main.o output/generated_table.o output/generated_stubs.o
+OPENIPE        = ../framework
+CC              = $(OPENIPE)/compiler.py
+LD              = $(OPENIPE)/linker.py
 
-AS              = msp430-as
-CC              = msp430-gcc
-CFLAGS          = -Wall -g -mcpu=430 -mmpy=none -D__MSP430F149__ -I$(shell msp430-gcc -print-file-name="include")
+NAME            = ipe-hello
+SOURCES         = $(shell ls *.c)
+OBJECTS         = $(SOURCES:.c=.o)
+
+INCLUDE         = -I$(OPENIPE) -I$(shell msp430-gcc -print-file-name="include")
+CFLAGS          = -Wall -std=gnu99 -g -mcpu=430 -mmpy=none -D__MSP430F149__
 LDFLAGS         = -L$(shell msp430-gcc -print-file-name="") -T pmem.x
 
-all: ${NAME}.elf
+all: $(NAME).elf
 
-${NAME}.elf: ${OBJECTS}
-	../framework/linker.py $(LDFLAGS) -o $@ ${OBJECTS}
+$(NAME).elf: $(OBJECTS)
+	$(LD) $(LDFLAGS) $(OBJECTS) -o $@ 
+
+%.o : %.c
+	$(CC) $(CFLAGS) $(INCLUDE) -c $< -o $@
 
 clean:
 	rm -f *.o *.elf *.ihex pmem.* output/*.o

@@ -1,4 +1,4 @@
-.include "../../bin/ipe_macros.asm"
+.include "/openipe/core/sim/rtl_sim/bin/ipe_macros.asm"
 
     ;; exported symbols
     .global ipe_ocall

@@ -3,6 +3,8 @@ import sys
 import os
 import re
 import subprocess
+import json
+
 from elftools.elf.elffile import ELFFile
 from elftools.elf.sections import SymbolTableSection
 
@@ -82,7 +84,7 @@ def retrieve_stubs_entries(files):
                 if isinstance(section, SymbolTableSection):
                     for symbol in section.iter_symbols():
                         if symbol.name.startswith("__ipe_ocall_"):
-                            funcName = symbol.name.removeprefix("__ipe_ecall_")
+                            funcName = symbol.name.removeprefix("__ipe_ocall_")
                             value = int(symbol.entry['st_value'])
                             if funcName not in dic_stubs_entries['stubs_names']:
                                 dic_stubs_entries['stubs_names'].append(funcName)
@@ -91,7 +93,7 @@ def retrieve_stubs_entries(files):
                                     'name': funcName + "_stub",
                                     'bitmap': f'{value:08b}',
                                 })
-                                print(f"ocall found: {dic_stubs_entries['stubs'][-1]}")
+                                info(f"ocall found: {dic_stubs_entries['stubs'][-1]}")
 
                         elif symbol.name.startswith("__ipe_ecall_"):
                             entry_name = symbol.name.removeprefix("__ipe_ecall_")
@@ -103,17 +105,9 @@ def retrieve_stubs_entries(files):
                                     'index': len(dic_stubs_entries['entries']),
                                     'bitmap': hex(symbol.entry['st_value']),
                                 })
-                                print(f"ecall found: {dic_stubs_entries['entries'][-1]}")
+                                info(f"ecall found: {dic_stubs_entries['entries'][-1]}")
     return dic_stubs_entries
 
-
-def run_cmd(cmdline):
-    cmdline = " ".join(cmdline)
-    print(f'running: {cmdline}')
-    c = subprocess.run("pwd; " + cmdline, shell=True, capture_output=True, text=True)
-    print(c.stdout, end='')
-    print(c.stderr, end='')
-    return c.returncode
 
 def main():
     # TODO: add arithmetic stubs
@@ -128,6 +122,7 @@ def main():
 
 
     files_to_compile = [get_tmp(suffix='.s'), get_tmp(suffix='.s')]
+    additional_files_to_link = []
 
     # write generated table file
     with open(os.path.abspath(os.path.dirname(sys.argv[0]) + '/libipe/templates/generated_table.s')) as file:
@@ -153,35 +148,37 @@ def main():
     
     for file in files_to_compile:
         file_name = file.removesuffix('.s')
-        call_prog("msp430-gcc", ['-c', file, '-o', f'{file_name}.o'])
+        additional_files_to_link.append(f'{file_name}.o')
+
+        call_prog("msp430-gcc", ['-c', file, '-o', additional_files_to_link[-1]])
 
 
-    '''
-    # Find all C/asm files in libipe
-    libipe = os.path.dirname(sys.argv[0]) + '/libipe'
-    libipe_files = []
-    for root, _, files in os.walk(libipe):
-        for filename in files:
-            if any(filename.endswith(ext) for ext in ['.s', '.asm', '.c']) and not root.endswith("templates") and not "irq" in filename:
-                libipe_files.append(os.path.join(root, filename))
+    default_config = {
+        'entry_stub': 'ipe-protected.s'
+    }
+    try:
+        with open("config.json") as config_json:
+            config = json.load(config_json)
+            for k in config:
+                default_config[k] = config[k]
+    except FileNotFoundError:
+        print("Config found cannot be found!")
 
-    # Compile libipe objects and add them to the linker cmdline
-    cc = 'msp430-gcc'
-    linker_args = [cc] + sys.argv[1:]
-    compiler_args = [cc] + CFLAGS.split(' ')
-    #compiler_args = [a for a in compiler_args if not any(re.match(r, a) for r in ld_only_opts)]
-    for f in libipe_files:
-        rv = run_cmd(compiler_args + ['-c', f])
-        if rv != 0:
-            print(f'fatal: compiler returned non-zero return value: {rv}')
-            sys.exit(rv)
-        # insert after the last obj file in the linker cmdline
-        objfile = os.path.splitext(os.path.basename(f))[0] + '.o'
+    print(f'Config used: {default_config}')
+
+    additional_files_to_link.append(get_tmp(suffix='.o'))
+    entry_stub_file = os.path.abspath(os.path.join(os.path.dirname(sys.argv[0]) + '/libipe/stubs/', default_config['entry_stub']))
+    call_prog("msp430-gcc", ['-c', entry_stub_file, '-o', additional_files_to_link[-1]])
+
+
+    linker_args = sys.argv[1:]
+    for object_name  in additional_files_to_link:
         last_obj_idx = max(idx for idx, val in enumerate(linker_args) if val.endswith('.o'))
-        linker_args.insert(last_obj_idx + 1, objfile)
+        linker_args.insert(last_obj_idx + 1, object_name)
 
-    # Finally link everything together with the default MSP430 linker
-    sys.exit(run_cmd(linker_args)) '''
+
+    call_prog("msp430-gcc", linker_args)
+
 
 if __name__ == '__main__':
     main()

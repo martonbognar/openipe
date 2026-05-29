@@ -89,9 +89,17 @@ initial
       @(r8==16'h0);
       repeat(100) @(posedge mclk);
 
-      $write("waiting for IPE result..        ");
-      @(r8==16'hABD0);
+      $write("waiting for IPE result 1..        ");
+      @(r9==16'hCACA);
       $display("\t[OK]");
+      if(r8 !== 16'hABCD)
+         $error("Error while running ipe_func");
+
+      $write("waiting for IPE result 2..        ");
+      @(r9==16'hCACB);
+      $display("\t[OK]");
+      if(r8 !== 16'h3)
+         $error("Error while running ipe_func");
 
       stimulus_done = 1;
 
