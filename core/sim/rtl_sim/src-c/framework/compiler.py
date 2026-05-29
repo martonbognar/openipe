@@ -221,8 +221,7 @@ if __name__ == "__main__":
     ocall_stub_creator.visit(original_ast)
 
     # compile converted AST in new C file
-    # out_c = get_tmp(suffix='.c')
-    out_c = "temp.i"
+    out_c = get_tmp(suffix='.c')
     with open(out_c, 'w') as newFile:
         newFile.write(GnuCGenerator().visit(generated_header))
         for line in GnuCGenerator().visit(original_ast).splitlines():
@@ -232,13 +231,7 @@ if __name__ == "__main__":
                 newFile.write(line + "\n")
 
     new_args = sys.argv[1:].copy()
-    index = new_args.index('-c')
-
-    new_args.insert(index, 'c-output')
-    new_args.insert(index, '-x')
-    
-
-    new_args[index + 3] = out_c
+    new_args[new_args.index('-c') + 1] = out_c
     new_args[new_args.index('-o') + 1] = f'{file_name}.o'
 
     call_prog("msp430-gcc", new_args)
