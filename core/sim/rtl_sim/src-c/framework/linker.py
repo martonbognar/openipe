@@ -91,7 +91,7 @@ def retrieve_stubs_entries(files):
                                     'name': funcName + "_stub",
                                     'bitmap': f'{value:08b}',
                                 })
-                                print(f"OCall Symbol: {dic_stubs_entries['stubs'][-1]}")
+                                print(f"ocall found: {dic_stubs_entries['stubs'][-1]}")
 
                         elif symbol.name.startswith("__ipe_ecall_"):
                             entry_name = symbol.name.removeprefix("__ipe_ecall_")
@@ -103,7 +103,7 @@ def retrieve_stubs_entries(files):
                                     'index': len(dic_stubs_entries['entries']),
                                     'bitmap': hex(symbol.entry['st_value']),
                                 })
-                                print(f"ECall Symbol: {dic_stubs_entries['entries'][-1]}")
+                                print(f"ecall found: {dic_stubs_entries['entries'][-1]}")
     return dic_stubs_entries
 
 
@@ -127,8 +127,7 @@ def main():
         #process_filename(filename)
 
 
-    #files_to_compile = [get_tmp(suffix='.s'), get_tmp(suffix='.s')]
-    files_to_compile = ['snd.s', 'fst.s']
+    files_to_compile = [get_tmp(suffix='.s'), get_tmp(suffix='.s')]
 
     # write generated table file
     with open(os.path.abspath(os.path.dirname(sys.argv[0]) + '/libipe/templates/generated_table.s')) as file:
