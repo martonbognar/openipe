@@ -185,8 +185,7 @@ if __name__ == "__main__":
         for x in sys.argv
         if x.endswith(".o")
     )
-    #pp_file = get_tmp(suffix='.pp')
-    pp_file = "preprocessed.pp"
+    pp_file = get_tmp(suffix='.pp')
     pp_argv = [
         "-E" if x == "-c"
         else pp_file if x.endswith(".o")
@@ -223,7 +222,7 @@ if __name__ == "__main__":
 
     # compile converted AST in new C file
     # out_c = get_tmp(suffix='.c')
-    out_c = "temp.c"
+    out_c = "temp.i"
     with open(out_c, 'w') as newFile:
         newFile.write(GnuCGenerator().visit(generated_header))
         for line in GnuCGenerator().visit(original_ast).splitlines():
@@ -233,7 +232,13 @@ if __name__ == "__main__":
                 newFile.write(line + "\n")
 
     new_args = sys.argv[1:].copy()
-    new_args[new_args.index('-c') + 1] = out_c
+    index = new_args.index('-c')
+
+    new_args.insert(index, 'c-output')
+    new_args.insert(index, '-x')
+    
+
+    new_args[index + 3] = out_c
     new_args[new_args.index('-o') + 1] = f'{file_name}.o'
 
     call_prog("msp430-gcc", new_args)
