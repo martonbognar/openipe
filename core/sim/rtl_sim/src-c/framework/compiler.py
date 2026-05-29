@@ -185,8 +185,8 @@ if __name__ == "__main__":
         for x in sys.argv
         if x.endswith(".o")
     )
-    pp_file = get_tmp(suffix='.pp')
-    
+    #pp_file = get_tmp(suffix='.pp')
+    pp_file = "preprocessed.pp"
     pp_argv = [
         "-E" if x == "-c"
         else pp_file if x.endswith(".o")
@@ -222,8 +222,8 @@ if __name__ == "__main__":
     ocall_stub_creator.visit(original_ast)
 
     # compile converted AST in new C file
-    out_c = get_tmp(suffix='.c')
-    #out_c = "temp.c"
+    # out_c = get_tmp(suffix='.c')
+    out_c = "temp.c"
     with open(out_c, 'w') as newFile:
         newFile.write(GnuCGenerator().visit(generated_header))
         for line in GnuCGenerator().visit(original_ast).splitlines():
