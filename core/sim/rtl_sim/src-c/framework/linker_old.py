@@ -4,12 +4,6 @@ import os
 import re
 import subprocess
 from elftools.elf.elffile import ELFFile
-from elftools.elf.sections import SymbolTableSection
-
-
-from jinja2 import Template
-from common import *
-
 
 CFLAGS = '-Wall -std=gnu99 -g -mcpu=430 -mmpy=none -D__MSP430F149__'
 
@@ -60,52 +54,9 @@ def patch_relocs(fn):
             f.seek(rel_offset+5)
             f.write(sym_idx.to_bytes(3, byteorder='little'))
 
-
 def process_filename(filename):
     print(f'processing relocations in: {filename}')
     patch_relocs(filename)
-
-
-def retrieve_stubs_entries(files):
-    dic_stubs_entries = {
-        'entries': [],
-        'stubs': [],
-
-        'entries_names': [],
-        'stubs_names': []
-    }   
-
-    for filename in files: 
-        with open(filename, 'rb') as f:
-            elf_file = ELFFile(f)
-            for section in elf_file.iter_sections():
-                if isinstance(section, SymbolTableSection):
-                    for symbol in section.iter_symbols():
-                        if symbol.name.startswith("__ipe_ocall_"):
-                            funcName = symbol.name.removeprefix("__ipe_ecall_")
-                            value = int(symbol.entry['st_value'])
-                            if funcName not in dic_stubs_entries['stubs_names']:
-                                dic_stubs_entries['stubs_names'].append(funcName)
-                                dic_stubs_entries['stubs'].append({
-                                    'function': funcName,
-                                    'name': funcName + "_stub",
-                                    'bitmap': f'{value:08b}',
-                                })
-                                print(f"OCall Symbol: {dic_stubs_entries['stubs'][-1]}")
-
-                        elif symbol.name.startswith("__ipe_ecall_"):
-                            entry_name = symbol.name.removeprefix("__ipe_ecall_")
-                            if entry_name not in dic_stubs_entries['entries_names']:
-                                dic_stubs_entries['stubs_names'].append(entry_name)
-                                dic_stubs_entries['entries'].append({
-                                    'internal_name': entry_name + '_internal',
-                                    'external_name': entry_name,
-                                    'index': len(dic_stubs_entries['entries']),
-                                    'bitmap': hex(symbol.entry['st_value']),
-                                })
-                                print(f"ECall Symbol: {dic_stubs_entries['entries'][-1]}")
-    return dic_stubs_entries
-
 
 def run_cmd(cmdline):
     cmdline = " ".join(cmdline)
@@ -116,48 +67,11 @@ def run_cmd(cmdline):
     return c.returncode
 
 def main():
-    # TODO: add arithmetic stubs
-
     # Extract non-option arguments (filenames) and call our custom relocation patcher
     filenames = [arg for arg in sys.argv[1:] if arg.endswith('.o') and not arg.startswith('-')]
-    dic_stubs_entries = retrieve_stubs_entries(filenames)
+    for filename in filenames:
+        process_filename(filename)
 
-
-    #for filename in filenames:
-        #process_filename(filename)
-
-
-    #files_to_compile = [get_tmp(suffix='.s'), get_tmp(suffix='.s')]
-    files_to_compile = ['snd.s', 'fst.s']
-
-    # write generated table file
-    with open(os.path.abspath(os.path.dirname(sys.argv[0]) + '/libipe/templates/generated_table.s')) as file:
-        table_template = Template(file.read())
-        table_obj = {
-            'max_entry_index': len(dic_stubs_entries['entries']) - 1,
-            'entry_functions': dic_stubs_entries['entries'],
-        }
-        with open(files_to_compile[0], "w") as target_file:
-            target_file.write(table_template.render(table_obj))
-
-
-    # write generated stubs
-    with open(os.path.abspath(os.path.dirname(sys.argv[0]) + '/libipe/templates/generated_stubs.s')) as file:
-        stubs_template = Template(file.read())
-        stubs_obj = {
-            'stubs_to_unprotected': dic_stubs_entries['stubs'],
-            'stubs_to_protected': dic_stubs_entries['entries'],
-        }
-        with open(files_to_compile[1], "w") as target_file:
-            target_file.write(stubs_template.render(stubs_obj))
-
-    
-    for file in files_to_compile:
-        file_name = file.removesuffix('.s')
-        call_prog("msp430-gcc", ['-c', file, '-o', f'{file_name}.o'])
-
-
-    '''
     # Find all C/asm files in libipe
     libipe = os.path.dirname(sys.argv[0]) + '/libipe'
     libipe_files = []
@@ -182,7 +96,7 @@ def main():
         linker_args.insert(last_obj_idx + 1, objfile)
 
     # Finally link everything together with the default MSP430 linker
-    sys.exit(run_cmd(linker_args)) '''
+    sys.exit(run_cmd(linker_args))
 
 if __name__ == '__main__':
     main()

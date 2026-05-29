@@ -113,6 +113,7 @@ class IPECollector(c_ast.NodeVisitor):
                             'index': self.index,
                             'bitmap': hex(int(make_bitmap(return_regs), 2)),
                         })
+                        print(self.entry_functions[-1])
                         self.index += 1
                         include_declaration(node.decl, self.generated_header, "")
                         # change declaration name not ecalls, because this way ecall from other file possible
