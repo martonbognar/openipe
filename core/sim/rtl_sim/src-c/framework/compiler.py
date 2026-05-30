@@ -4,7 +4,6 @@ from common import *
 import copy
 import os
 import sys
-import atexit
 
 from pycparser import c_ast
 from pycparserext import ext_c_parser
@@ -113,6 +112,7 @@ class IPECollector(c_ast.NodeVisitor):
                             'index': self.index,
                             'bitmap': hex(int(make_bitmap(return_regs), 2)),
                         })
+                        print(self.entry_functions[-1])
                         self.index += 1
                         include_declaration(node.decl, self.generated_header, "")
                         # change declaration name not ecalls, because this way ecall from other file possible
@@ -185,7 +185,6 @@ if __name__ == "__main__":
         if x.endswith(".o")
     )
     pp_file = get_tmp(suffix='.pp')
-    
     pp_argv = [
         "-E" if x == "-c"
         else pp_file if x.endswith(".o")
@@ -229,7 +228,12 @@ if __name__ == "__main__":
                 newFile.write(line + ";\n")
             else:
                 newFile.write(line + "\n")
-    call_prog("msp430-gcc", ['-c', out_c, '-o', f'{file_name}.o'])
+
+    new_args = sys.argv[1:].copy()
+    new_args[new_args.index('-c') + 1] = out_c
+    new_args[new_args.index('-o') + 1] = f'{file_name}.o'
+
+    call_prog("msp430-gcc", new_args)
 
     # Store name + bitmap in .o file for later processing by linker
     # NOTE: the `--add-symbol` option is only available for GNU binutils > msp430-gcc;
@@ -240,8 +244,3 @@ if __name__ == "__main__":
     for ocall in ocall_stub_creator.stubs:
         call_prog('msp430-elf-objcopy', ['--add-symbol',
                  f'__ipe_ocall_{ocall["function"]}={hex(int(ocall["bitmap"],2))},weak', f'{file_name}.o'])
-
-@atexit.register
-def cleanup():
-    rm("./lextab.py")
-    rm("./yacctab.py")

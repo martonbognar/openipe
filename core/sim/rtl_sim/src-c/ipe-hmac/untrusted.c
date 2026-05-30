@@ -1,6 +1,9 @@
-#include <stdint.h>
 #include <msp430.h>
-#include "output/generated_ipe_header.h"
+
+#include "../framework/libipe/ipe_support.h"
+
+
+int IPE_ENTRY attest(void);
 
 uint8_t mac_region[33] = {0};
 
