@@ -4,7 +4,6 @@ from common import *
 import copy
 import os
 import sys
-import atexit
 
 from pycparser import c_ast
 from pycparserext import ext_c_parser
@@ -240,8 +239,3 @@ if __name__ == "__main__":
     for ocall in ocall_stub_creator.stubs:
         call_prog('msp430-elf-objcopy', ['--add-symbol',
                  f'__ipe_ocall_{ocall["function"]}={hex(int(ocall["bitmap"],2))},weak', f'{file_name}.o'])
-
-@atexit.register
-def cleanup():
-    rm("./lextab.py")
-    rm("./yacctab.py")
