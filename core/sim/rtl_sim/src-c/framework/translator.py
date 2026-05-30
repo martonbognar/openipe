@@ -256,7 +256,4 @@ if __name__ == "__main__":
         else:
             newFile.write(line + "\n")
 
-    # clean up
-    os.remove("./lextab.py")
-    os.remove("./yacctab.py")
     os.remove(pp_file_name)
