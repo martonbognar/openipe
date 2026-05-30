@@ -4,6 +4,7 @@ from common import *
 import copy
 import os
 import sys
+import argparse
 
 from pycparser import c_ast
 from pycparserext import ext_c_parser
@@ -94,6 +95,7 @@ class IPECollector(c_ast.NodeVisitor):
         self.ipe_functions = {}
         self.inline_functions = {}
         self.entry_functions = []
+        self.entry_functions_names = []
         self.ast = ast
 
     def _check_attributes(self, decl, node=None):
@@ -122,8 +124,8 @@ class IPECollector(c_ast.NodeVisitor):
                             'index': self.index,
                             'bitmap': hex(int(make_bitmap(return_regs), 2)),
                         })
+                        self.entry_functions_names.append(function_name)
                         self.index += 1
-
                         # change declaration name not ecalls, because this way ecall from other file possible
                         insert_ast_func_decl(self.ast, decl, suffix="")
                         decl.type.type.declname = internal_name
@@ -140,9 +142,10 @@ class IPECollector(c_ast.NodeVisitor):
 
 # register all ocalls in IPE function + redirect ocall to new stub
 class OcallCollector(c_ast.NodeVisitor):
-    def __init__(self, ipe_functions, inline_functions):
+    def __init__(self, ipe_functions, inline_functions, ipe_entries_names):
         self.ipe_functions = ipe_functions
         self.inline_functions = inline_functions
+        self.ipe_entries_names = ipe_entries_names
         self.ocall_functions = {}
         self.ocall_detected = False
 
@@ -156,7 +159,7 @@ class OcallCollector(c_ast.NodeVisitor):
             self.ocall_functions[funcName] = node
             # change ocalls not declaration, because unprotected --> unprotected calls should not go through stub
             node.name.name += "_stub"
-        if funcName in self.ipe_functions:
+        if funcName in self.ipe_functions and funcName in self.ipe_entries_names:
             node.name.name += "_internal"
 
 # for all ocalls in IPE:
@@ -193,6 +196,25 @@ class OcallStubCreator(c_ast.NodeVisitor):
 
 ###################################################################
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description='openIPE compiler')
+    parser.add_argument(
+        '-o',
+        dest='out_file',
+        help='Place the output into file',
+        metavar='file'
+    )
+    parser.add_argument('-c',
+        dest='compile_only',
+        help='Compile and assemble, but do not link',
+        action='store_true'
+    )
+
+    args, _ = parser.parse_known_args()
+    if not args.compile_only:
+        fatal_error("Only supports modular compilation with -c")   
+    elif not args.out_file:
+        fatal_error("You need to provide an output file with -o")
+
     debug(f"openipe-cc {sys.argv[1:]}")
 
     # Run the input C file through the preprocessor
@@ -223,7 +245,7 @@ if __name__ == "__main__":
     info(f"Found ecalls: {[e['external_name'] for e in ipe_collector.entry_functions]}")
 
     # Redirect all IPE->untrusted calls (ocalls) through stub
-    ocall_collector = OcallCollector(ipe_collector.ipe_functions, ipe_collector.inline_functions)
+    ocall_collector = OcallCollector(ipe_collector.ipe_functions, ipe_collector.inline_functions, ipe_collector.entry_functions_names)
     for ipe_fn in ipe_collector.ipe_functions.values():
         if ipe_fn:
             ocall_collector.ocall_detected = False
@@ -243,17 +265,8 @@ if __name__ == "__main__":
                 newFile.write(line + "\n")
 
     new_args = sys.argv[1:].copy()
-    try:
-        new_args[new_args.index('-c') + 1] = out_c
-    except ValueError:
-        error("Only supports modular compilation with -c")
-        exit(1)
-
-    try:    
-        new_args[new_args.index('-o') + 1] = f'{file_name}.o'
-    except ValueError:
-        error("You need to provide an output file with -o")
-        exit(1)
+    new_args[new_args.index('-c') + 1] = out_c
+    new_args[new_args.index('-o') + 1] = f'{file_name}.o'
 
     call_prog("msp430-gcc", new_args)
 

@@ -2,3 +2,4 @@ pycparser==3.0
 pycparserext==2026.1
 pyelftools==0.33
 Jinja2==3.1.6
+colorama==0.4.6

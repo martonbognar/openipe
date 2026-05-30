@@ -28,28 +28,24 @@ initial
       @(r8==16'hDEAD);
       $display("\t[OK]");
 
-      $write("waiting for IPE mem access..    ");
-      @(r8==16'h3FFF);
-      $display("\t[OK]");
-
       $write("waiting for IPE call..          ");
       @(dut.ipe.ipe_executing);
       $display("\t[OK]");
 
-      @(r8==16'h0);
-      repeat(100) @(posedge mclk);
-
-      $write("waiting for IPE result 1..        ");
-      @(r9==16'hCACA);
+      $write("waiting for IPE return..          ");
+      @(r8==16'hBEEF);
       $display("\t[OK]");
-      if(r8 !== 16'hABCD)
-         $error("Error while running ipe_func");
 
-      $write("waiting for IPE result 2..        ");
-      @(r9==16'hCACB);
+      if(r7 !== 16'd31)
+         tb_error("Wrong cipher computed");
+
+
+      $write("waiting to get plain text..          ");
+      @(r8==16'hCACA);
       $display("\t[OK]");
-      if(r8 !== 16'h2)
-         $error("Error while running ipe_func");
+
+      if(r7 !== 16'h4)
+         tb_error("Wrong plain text computed");
 
       stimulus_done = 1;
 

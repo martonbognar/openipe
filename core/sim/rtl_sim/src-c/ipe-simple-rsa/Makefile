@@ -1,6 +1,6 @@
 include ../Makefile.include
 
-NAME            = ipe-hmac
+NAME            = ipe-simple-rsa
 SOURCES         = $(shell ls *.c)
 OBJECTS         = $(SOURCES:.c=.o)
 
