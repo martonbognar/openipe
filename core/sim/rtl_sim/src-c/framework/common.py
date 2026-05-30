@@ -60,7 +60,8 @@ def call_prog(prog, arguments=[], get_output=False):
     except subprocess.CalledProcessError:
         fatal_error(f'Command {prog} failed')
 
-
 def fatal_error(msg):
     error(colorama.Style.BRIGHT + colorama.Fore.RED + msg + colorama.Style.RESET_ALL)
+    info(f'leaving temporary files: {tmp_files}')
+    atexit.unregister(cleanup)
     sys.exit(1)
