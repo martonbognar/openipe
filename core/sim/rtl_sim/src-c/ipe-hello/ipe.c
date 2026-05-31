@@ -15,7 +15,7 @@ int IPE_ENTRY ipe_func(int a)
 {
     char *c = (char *)ipe_dummy1;
     *c = 0;
-    return (a + b) + ipe_dummy2_outside(-1);
+    return (a + b) * ipe_dummy2_outside(0);
 }
 
 void IPE_ENTRY another_entry(void)

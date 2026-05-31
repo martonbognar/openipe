@@ -17,7 +17,7 @@ int IPE_ENTRY ipe_func(int a);
 
 int IPE_ENTRY ipe_func2(int a)
 {
-    return ipe_dummy2_outside(a) + ipe_dummy2_outside2(a);
+    return ipe_dummy2_outside(a) * ipe_dummy2_outside2(a);
 }
 
 int main(void)

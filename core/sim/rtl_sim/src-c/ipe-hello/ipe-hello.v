@@ -98,7 +98,7 @@ initial
       $write("waiting for IPE result 2..        ");
       @(r9==16'hCACB);
       $display("\t[OK]");
-      if(r8 !== 16'h3)
+      if(r8 !== 16'h2)
          $error("Error while running ipe_func");
 
       stimulus_done = 1;

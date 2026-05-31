@@ -15,7 +15,31 @@ from common import *
 
 CFLAGS = '-Wall -std=gnu99 -g -mcpu=430 -mmpy=none -D__MSP430F149__'
 
-def patch_relocs(fn):
+
+def add_sym(file, sym_map):
+    args = []
+
+    for sym, sect in sym_map.items():
+        args += ['--add-symbol', f'{sym}={sect}:0,weak']
+
+    args += [file, file]
+    call_prog('msp430-elf-objcopy', args)
+    return file
+
+
+def is_section_in_file(fn, section_name):
+    with open(fn, 'rb') as f:
+        elf_file = ELFFile(f)
+        return elf_file.get_section_by_name(section_name)
+    
+
+def create_empty_section(fn, section_name):
+    nf = get_tmp(suffix='.bin')
+    call_prog('msp430-elf-objcopy', ['--add-section', f'{section_name}={nf}', fn, fn])
+
+
+
+def get_elf_relocations(fn):
     elf_relocations = []
 
     with open(fn, 'rb') as f:
@@ -38,6 +62,41 @@ def patch_relocs(fn):
                     print(f'\tL__ intercepting relocation {sym.name}')
                     rel_offset = section['sh_offset'] + n * section['sh_entsize']
                     elf_relocations.append((rel_offset, sym.name))
+
+    return elf_relocations
+
+
+
+def patch_relocs(fn):
+    elf_relocations = get_elf_relocations(fn)
+    stubs_to_include = []
+
+
+
+    for (rel_offset, sym_name) in elf_relocations:
+        fn_stub = 'ipe_' + sym_name.removeprefix("__")
+        match fn_stub:
+            case "ipe_divhi3":
+                stubs_to_include.append(os.path.abspath(os.path.dirname(sys.argv[0]) + f'/libipe/arithmetic_stubs/ipe_udivhi3.s'))
+            case "ipe_modhi3":
+                stubs_to_include.append(os.path.abspath(os.path.dirname(sys.argv[0]) + f'/libipe/arithmetic_stubs/ipe_divhi3.s'))
+                stubs_to_include.append(os.path.abspath(os.path.dirname(sys.argv[0]) + f'/libipe/arithmetic_stubs/ipe_udivhi3.s'))
+            case "ipe_umodhi3":
+                stubs_to_include.append(os.path.abspath(os.path.dirname(sys.argv[0]) + f'/libipe/arithmetic_stubs/ipe_udivhi3.s'))
+
+        stubs_to_include.append(os.path.abspath(os.path.dirname(sys.argv[0]) + f'/libipe/arithmetic_stubs/{fn_stub}.s'))
+
+
+    sym_map = {'__ipe_' + sym_name : '.ipe_func' for (_, sym_name) in elf_relocations}
+    
+    if not is_section_in_file(fn, '.ipe_func'):
+        print("HUMMM")
+        create_empty_section(fn, '.ipe_func')
+
+    add_sym(fn, sym_map)
+
+    # add_sym modified offsets
+    elf_relocations = get_elf_relocations(fn)
 
     print(f".. applying relocation patches to '{fn}'")
     with open(fn, 'r+b') as f:
@@ -62,10 +121,12 @@ def patch_relocs(fn):
             f.seek(rel_offset+5)
             f.write(sym_idx.to_bytes(3, byteorder='little'))
 
+    return stubs_to_include
+
 
 def process_filename(filename):
     print(f'processing relocations in: {filename}')
-    patch_relocs(filename)
+    return patch_relocs(filename)
 
 
 def retrieve_stubs_entries(files):
@@ -110,39 +171,41 @@ def retrieve_stubs_entries(files):
 
 
 def main():
-    # TODO: add arithmetic stubs
-
     # Extract non-option arguments (filenames) and call our custom relocation patcher
     filenames = [arg for arg in sys.argv[1:] if arg.endswith('.o') and not arg.startswith('-')]
+
+    files_to_compile = set()
+    additional_files_to_link = []
+    
+    for filename in filenames:
+        files_to_compile = files_to_compile.union(set(process_filename(filename)))    
+
+    files_to_compile = list(files_to_compile)
+
     dic_stubs_entries = retrieve_stubs_entries(filenames)
 
 
-    #for filename in filenames:
-        #process_filename(filename)
-
-
-    files_to_compile = [get_tmp(suffix='.s'), get_tmp(suffix='.s')]
-    additional_files_to_link = []
-
     # write generated table file
+    files_to_compile.append(get_tmp(suffix='.s'))
     with open(os.path.abspath(os.path.dirname(sys.argv[0]) + '/libipe/templates/generated_table.s')) as file:
         table_template = Template(file.read())
         table_obj = {
             'max_entry_index': len(dic_stubs_entries['entries']) - 1,
             'entry_functions': dic_stubs_entries['entries'],
         }
-        with open(files_to_compile[0], "w") as target_file:
+        with open(files_to_compile[-1], "w") as target_file:
             target_file.write(table_template.render(table_obj))
 
 
     # write generated stubs
+    files_to_compile.append(get_tmp(suffix='.s'))
     with open(os.path.abspath(os.path.dirname(sys.argv[0]) + '/libipe/templates/generated_stubs.s')) as file:
         stubs_template = Template(file.read())
         stubs_obj = {
             'stubs_to_unprotected': dic_stubs_entries['stubs'],
             'stubs_to_protected': dic_stubs_entries['entries'],
         }
-        with open(files_to_compile[1], "w") as target_file:
+        with open(files_to_compile[-1], "w") as target_file:
             target_file.write(stubs_template.render(stubs_obj))
 
     
