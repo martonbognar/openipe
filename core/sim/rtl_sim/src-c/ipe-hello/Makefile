@@ -1,6 +1,4 @@
-OPENIPE        = ../framework
-CC              = $(OPENIPE)/compiler.py
-LD              = $(OPENIPE)/linker.py
+include ../Makefile.include
 
 NAME            = ipe-hello
 SOURCES         = $(shell ls *.c)
