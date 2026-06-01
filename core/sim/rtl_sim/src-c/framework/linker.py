@@ -65,31 +65,17 @@ def get_elf_relocations(fn):
 
     return elf_relocations
 
+def get_arith_subs():
+    stubs_file = os.path.abspath(os.path.dirname(sys.argv[0]) + '/libipe/arithmetic_stubs/')
+    return [os.path.join(root, file) for root, _, files in os.walk(stubs_file) for file in files if file.endswith('.s')]
 
 
 def patch_relocs(fn):
     elf_relocations = get_elf_relocations(fn)
-    stubs_to_include = []
-
-
-
-    for (rel_offset, sym_name) in elf_relocations:
-        fn_stub = 'ipe_' + sym_name.removeprefix("__")
-        match fn_stub:
-            case "ipe_divhi3":
-                stubs_to_include.append(os.path.abspath(os.path.dirname(sys.argv[0]) + f'/libipe/arithmetic_stubs/ipe_udivhi3.s'))
-            case "ipe_modhi3":
-                stubs_to_include.append(os.path.abspath(os.path.dirname(sys.argv[0]) + f'/libipe/arithmetic_stubs/ipe_divhi3.s'))
-                stubs_to_include.append(os.path.abspath(os.path.dirname(sys.argv[0]) + f'/libipe/arithmetic_stubs/ipe_udivhi3.s'))
-            case "ipe_umodhi3":
-                stubs_to_include.append(os.path.abspath(os.path.dirname(sys.argv[0]) + f'/libipe/arithmetic_stubs/ipe_udivhi3.s'))
-
-        stubs_to_include.append(os.path.abspath(os.path.dirname(sys.argv[0]) + f'/libipe/arithmetic_stubs/{fn_stub}.s'))
-
-
     sym_map = {'__ipe_' + sym_name : '.ipe_func' for (_, sym_name) in elf_relocations}
     
     if not is_section_in_file(fn, '.ipe_func'):
+        info("Section .ipe_func can't be found. Going to create an empty!")
         create_empty_section(fn, '.ipe_func')
 
     add_sym(fn, sym_map)
@@ -120,7 +106,7 @@ def patch_relocs(fn):
             f.seek(rel_offset+5)
             f.write(sym_idx.to_bytes(3, byteorder='little'))
 
-    return stubs_to_include
+    return len(elf_relocations)
 
 
 def process_filename(filename):
@@ -172,14 +158,10 @@ def retrieve_stubs_entries(files):
 def main():
     # Extract non-option arguments (filenames) and call our custom relocation patcher
     filenames = [arg for arg in sys.argv[1:] if arg.endswith('.o') and not arg.startswith('-')]
-
-    files_to_compile = set()
-    additional_files_to_link = []
     
-    for filename in filenames:
-        files_to_compile = files_to_compile.union(set(process_filename(filename)))    
-
-    files_to_compile = list(files_to_compile)
+    additional_files_to_link = []
+    files_to_compile = get_arith_subs() if sum([process_filename(filename) for filename in filenames]) > 0 else []
+    print(files_to_compile)
 
     dic_stubs_entries = retrieve_stubs_entries(filenames)
 

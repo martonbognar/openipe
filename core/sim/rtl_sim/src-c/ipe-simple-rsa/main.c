@@ -44,7 +44,7 @@ uint16_t IPE_ENTRY rsa_decode(int cipher){
 
 int main(void)
 {
-    int result = 2;
+    uint16_t result = 2;
     WDTCTL = WDTPW | WDTHOLD; // Stop Watchdog
 
     asm __volatile__("mov %0, r8" ::"r"(0xdead) : "r8");

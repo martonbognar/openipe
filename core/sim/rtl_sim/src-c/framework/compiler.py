@@ -113,7 +113,7 @@ class IPECollector(c_ast.NodeVisitor):
                             'bitmap': hex(int(make_bitmap(return_regs), 2)),
                         })
                         self.index += 1
-                        include_declaration(node.decl, self.generated_header, "")
+                        # include_declaration(node.decl, self.generated_header, "")
                         # change declaration name not ecalls, because this way ecall from other file possible
                         node.decl.type.type.declname = internal_name
                         # append function with new name to ext ast
@@ -227,6 +227,7 @@ if __name__ == "__main__":
                 newFile.write(line + ";\n")
             else:
                 newFile.write(line + "\n")
+        
 
     new_args = sys.argv[1:].copy()
     try:
