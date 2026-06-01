@@ -244,28 +244,3 @@ def main():
 
 if __name__ == '__main__':
     main()
-
-
-
-"""
-    # TODO the generated table and stubs should be saved and alterprocessed by the linker
-    # write generated table file
-    with open(LIBIPE + '/templates/generated_table.s') as file:
-        table_template = Template(file.read())
-        table_obj = {
-            'max_entry_index': ipe_collector.index - 1,
-            'entry_functions': ipe_collector.entry_functions,
-        }
-        with open("output/generated_table.s", "w") as target_file:
-            target_file.write(table_template.render(table_obj))
-
-    # write generated stubs
-    with open(LIBIPE + '/templates/generated_stubs.s') as file:
-        stubs_template = Template(file.read())
-        stubs_obj = {
-            'stubs_to_unprotected': ocall_stub_creator.stubs,
-            'stubs_to_protected': ipe_collector.entry_functions,
-        }
-        with open("output/generated_stubs.s", "w") as target_file:
-            target_file.write(stubs_template.render(stubs_obj))
-"""
