@@ -1,5 +1,11 @@
 ;;;;; ugly hack to determine include path depending on C or ASM test
 
+.ifdef __IPE_CUSTOM_IVT
+    .include "../bin/ipe_macros.asm"
+.else
+    .include "../../bin/ipe_macros.asm"
+.endif
+
 .include "/openipe/core/sim/rtl_sim/bin/ipe_macros.asm"
 
     ;; exported symbols
