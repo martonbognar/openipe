@@ -144,7 +144,7 @@ def retrieve_stubs_entries(files):
                         elif symbol.name.startswith("__ipe_ecall_"):
                             entry_name = symbol.name.removeprefix("__ipe_ecall_")
                             if entry_name not in dic_stubs_entries['entries_names']:
-                                dic_stubs_entries['stubs_names'].append(entry_name)
+                                dic_stubs_entries['entries_names'].append(entry_name)
                                 dic_stubs_entries['entries'].append({
                                     'internal_name': entry_name + '_internal',
                                     'external_name': entry_name,
