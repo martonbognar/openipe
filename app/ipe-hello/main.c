@@ -6,7 +6,7 @@ int ipe_dummy2_outside(int x)
     return x + 1;
 }
 
-int ipe_dummy2_outside2(int x)
+int ipe_dummy2_outside2(uint16_t x)
 {
     return x + 2;
 }
@@ -14,6 +14,11 @@ int ipe_dummy2_outside2(int x)
 int IPE_VAR b;
 
 int IPE_ENTRY ipe_func(int a);
+
+void IPE_ENTRY another_entry(void)
+{
+    return;
+}
 
 int IPE_ENTRY ipe_func2(int a)
 {

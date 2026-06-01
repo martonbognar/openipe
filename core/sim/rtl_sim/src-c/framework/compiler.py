@@ -35,14 +35,26 @@ def break_if_stack_passing(funcDefExt, reg_used):
         if reg_used > 4:
             raise NotImplementedError("Stack passing in " + funcName)
 
-# include declaration of function at top of translated file
-def include_declaration(funcDecl, includeAst, suffix):
+def make_declaration(funcDecl, suffix):
     decl_copy = copy.deepcopy(funcDecl)
     decl_copy.name += suffix
     decl_copy.type.type.declname += suffix
     # delete function attributes
     decl_copy.funcspec = []
-    includeAst.ext.append(decl_copy)
+    return decl_copy
+
+def insert_ast_func_decl(ast, orig_decl, suffix=""):
+    # include stub declaration in AST following original declaration
+    # (to ensure any typedef dependencies are satisfied)
+    for i, n in enumerate(ast.ext):
+        if hasattr(n, 'decl'):
+            n = n.decl
+        if isinstance(n.type, ext_c_parser.FuncDeclExt):
+            if n == orig_decl:
+                stub = make_declaration(n, suffix=suffix)
+                ast.ext.insert(i + 1, stub)
+                return
+    error(f"insert_ast_func_decl: declaration '{orig_decl.name}' not found in AST")
 
 # return the number of registers used as argument to a function
 class ArgumentRegCounter(c_ast.NodeVisitor):
@@ -76,20 +88,18 @@ class ArgumentRegCounter(c_ast.NodeVisitor):
 #   change name of function
 #   add to entry function table
 #   write a unprotected stub with old name
-#   include declaration of stub at top of translated file
 class IPECollector(c_ast.NodeVisitor):
-    def __init__(self, generated_header, replacement_functions):
+    def __init__(self, ast):
         self.index = 0
-        self.generated_header = generated_header
-        self.replacement_functions = replacement_functions
         self.ipe_functions = {}
         self.inline_functions = {}
         self.entry_functions = []
+        self.ast = ast
 
-    def visit_FuncDef(self, node):
-        function_name = node.decl.name
+    def _check_attributes(self, decl, node=None):
         # check attributes for IPE annotations (see ipe.support.h), if IPE function then register function name
-        for attributes_group in node.decl.funcspec:
+        function_name = decl.name
+        for attributes_group in decl.funcspec:
             if attributes_group == "inline" or attributes_group == "__inline__":
                 # if inlined function, we ignore it
                 self.inline_functions[function_name] = node
@@ -101,11 +111,11 @@ class IPECollector(c_ast.NodeVisitor):
                     if sectionName == ".ipe_entry":
                         self.ipe_functions[function_name] = node
                         internal_name = function_name + "_internal"
-                        if (node.decl.type.args):
+                        if (decl.type.args):
                             v = ArgumentRegCounter()
-                            v.visit(node.decl.type.args)
-                            break_if_stack_passing(node.decl.type, v.reg_used)
-                        return_regs = ArgumentRegCounter.nb_reg_used(node.decl.type.type.type.names)
+                            v.visit(decl.type.args)
+                            break_if_stack_passing(decl.type, v.reg_used)
+                        return_regs = ArgumentRegCounter.nb_reg_used(decl.type.type.type.names)
                         self.entry_functions.append({
                             'internal_name': internal_name,
                             'external_name': function_name,
@@ -113,13 +123,20 @@ class IPECollector(c_ast.NodeVisitor):
                             'bitmap': hex(int(make_bitmap(return_regs), 2)),
                         })
                         self.index += 1
-                        include_declaration(node.decl, self.generated_header, "")
+
                         # change declaration name not ecalls, because this way ecall from other file possible
-                        node.decl.type.type.declname = internal_name
-                        # append function with new name to ext ast
-                        self.replacement_functions.ext.append(node)
+                        insert_ast_func_decl(self.ast, decl, suffix="")
+                        decl.type.type.declname = internal_name
+
                     if sectionName == ".ipe_func":
                         self.ipe_functions[function_name] = node
+    
+    def visit_Decl(self, node):
+        if isinstance(node.type, ext_c_parser.FuncDeclExt):
+            self._check_attributes(node)
+
+    def visit_FuncDef(self, node):
+        self._check_attributes(node.decl, node)
 
 # register all ocalls in IPE function + redirect ocall to new stub
 class OcallCollector(c_ast.NodeVisitor):
@@ -139,19 +156,20 @@ class OcallCollector(c_ast.NodeVisitor):
             self.ocall_functions[funcName] = node
             # change ocalls not declaration, because unprotected --> unprotected calls should not go through stub
             node.name.name += "_stub"
+        if funcName in self.ipe_functions:
+            node.name.name += "_internal"
 
 # for all ocalls in IPE:
 #   write a protected stub
-#   include declaration of new stub at top of translated file
+#   include declaration of new stub following existing declaration
 class OcallStubCreator(c_ast.NodeVisitor):
-    def __init__(self, generated_header, ocall_functions):
-        self.generated_header = generated_header
+    def __init__(self, ocall_functions, ast):
         self.ocall_functions = ocall_functions
+        self.ast = ast
         self.stubs = []
 
     def visit_Decl(self, node):
-        arg_type = node.type
-        if isinstance(arg_type, ext_c_parser.FuncDeclExt):
+        if isinstance(node.type, ext_c_parser.FuncDeclExt):
             if not isinstance(node.type.type, c_ast.TypeDecl):
                 return
             funcName = node.type.type.declname
@@ -171,7 +189,7 @@ class OcallStubCreator(c_ast.NodeVisitor):
                         'name': funcName + "_stub",
                         'bitmap': make_bitmap(0),
                     })
-                include_declaration(node, self.generated_header, "_stub")
+                insert_ast_func_decl(self.ast, node, suffix="_stub")
 
 ###################################################################
 if __name__ == "__main__":
@@ -197,38 +215,47 @@ if __name__ == "__main__":
     parser = ext_c_parser.GnuCParser()
     with open(pp_file, "r") as pf:
         src = pf.read()
-
-    original_ast = parser.parse(src, filename=pp_file)
-    replacement_functions = parser.parse("", filename='<none>')
-    generated_header = parser.parse("", filename='<none>')
+    original_ast = parser.parse(src)
 
     # Redirect all untrusted->IPE calls (ecalls) through stub
-    ipe_collector = IPECollector(generated_header, replacement_functions)
+    ipe_collector = IPECollector(original_ast)
     ipe_collector.visit(original_ast)
     info(f"Found ecalls: {[e['external_name'] for e in ipe_collector.entry_functions]}")
 
     # Redirect all IPE->untrusted calls (ocalls) through stub
     ocall_collector = OcallCollector(ipe_collector.ipe_functions, ipe_collector.inline_functions)
     for ipe_fn in ipe_collector.ipe_functions.values():
-        ocall_collector.ocall_detected = False
-        ocall_collector.visit(ipe_fn)
-        if ocall_collector.ocall_detected and ipe_fn not in replacement_functions.ext:
-            replacement_functions.ext.append(ipe_fn)
+        if ipe_fn:
+            ocall_collector.ocall_detected = False
+            ocall_collector.visit(ipe_fn)
     
     info(f"Found ocalls: {list(ocall_collector.ocall_functions.keys())}")
-    ocall_stub_creator = OcallStubCreator(generated_header, ocall_collector.ocall_functions)
+    ocall_stub_creator = OcallStubCreator(ocall_collector.ocall_functions, original_ast)
     ocall_stub_creator.visit(original_ast)
 
     # compile converted AST in new C file
     out_c = get_tmp(suffix='.c')
     with open(out_c, 'w') as newFile:
-        newFile.write(GnuCGenerator().visit(generated_header))
         for line in GnuCGenerator().visit(original_ast).splitlines():
             if "asm" in line:
                 newFile.write(line + ";\n")
             else:
                 newFile.write(line + "\n")
-    call_prog("msp430-gcc", ['-c', out_c, '-o', f'{file_name}.o'])
+
+    new_args = sys.argv[1:].copy()
+    try:
+        new_args[new_args.index('-c') + 1] = out_c
+    except ValueError:
+        error("Only supports modular compilation with -c")
+        exit(1)
+
+    try:    
+        new_args[new_args.index('-o') + 1] = f'{file_name}.o'
+    except ValueError:
+        error("You need to provide an output file with -o")
+        exit(1)
+
+    call_prog("msp430-gcc", new_args)
 
     # Store name + bitmap in .o file for later processing by linker
     # NOTE: the `--add-symbol` option is only available for GNU binutils > msp430-gcc;
