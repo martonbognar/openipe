@@ -48,7 +48,7 @@ def get_elf_relocations(fn):
         for section in elf_file.iter_sections():
             if not re.match(r'.rela.ipe_(func|entry)', section.name):
                 continue
-            print(f'.. processing section <{section.name}>')
+            info(f'.. processing section <{section.name}>')
 
             symtab = elf_file.get_section(section['sh_link'])
             for n in range(section.num_relocations()):
@@ -59,7 +59,7 @@ def get_elf_relocations(fn):
                 # inserted by the compiler back-end; see also:
                 # https://gcc.gnu.org/onlinedocs/gccint/Integer-library-routines.html
                 if re.match(r'(memset|__(u|)(ashl|ashr|lshr|mul|div|mod)(q|h|s|d|t)i.*)', sym.name):
-                    print(f'\tL__ intercepting relocation {sym.name}')
+                    info(f'\tL__ intercepting relocation {sym.name}')
                     rel_offset = section['sh_offset'] + n * section['sh_entsize']
                     elf_relocations.append((rel_offset, sym.name))
 
@@ -90,7 +90,6 @@ def patch_relocs(fn):
     sym_map = {'__ipe_' + sym_name : '.ipe_func' for (_, sym_name) in elf_relocations}
     
     if not is_section_in_file(fn, '.ipe_func'):
-        print("HUMMM")
         create_empty_section(fn, '.ipe_func')
 
     add_sym(fn, sym_map)
@@ -98,7 +97,7 @@ def patch_relocs(fn):
     # add_sym modified offsets
     elf_relocations = get_elf_relocations(fn)
 
-    print(f".. applying relocation patches to '{fn}'")
+    info(f".. applying relocation patches to '{fn}'")
     with open(fn, 'r+b') as f:
         elf_file = ELFFile(f)
         symtab = elf_file.get_section_by_name('.symtab')
@@ -110,14 +109,14 @@ def patch_relocs(fn):
                 if symtab.get_symbol(sym_idx).name == ipe_sym_name:
                     break
             if (symtab.get_symbol(sym_idx).name != ipe_sym_name):
-                print(f"\tL__ WARNING: '{ipe_sym_name:22}' not defined; skipping..")
+                info(f"\tL__ WARNING: '{ipe_sym_name:22}' not defined; skipping..")
                 continue
 
             # overwrite symbol table index in targeted relocation
             # skip r_offset and patch r_info 3 bytes (litte endian; lower byte
             # stores relocation type)
             # https://wiki.osdev.org/ELF_Tutorial#Relocation_Sections
-            print(f"\tL__ patching relocation  for symbol '{sym_name:22}'@{rel_offset} -> '{ipe_sym_name:27}'@{sym_idx}")
+            info(f"\tL__ patching relocation  for symbol '{sym_name:22}'@{rel_offset} -> '{ipe_sym_name:27}'@{sym_idx}")
             f.seek(rel_offset+5)
             f.write(sym_idx.to_bytes(3, byteorder='little'))
 
@@ -125,7 +124,7 @@ def patch_relocs(fn):
 
 
 def process_filename(filename):
-    print(f'processing relocations in: {filename}')
+    info(f'processing relocations in: {filename}')
     return patch_relocs(filename)
 
 
@@ -225,9 +224,9 @@ def main():
             for k in config:
                 default_config[k] = config[k]
     except FileNotFoundError:
-        print("Config found cannot be found!")
+        info("Config found cannot be found!")
 
-    print(f'Config used: {default_config}')
+    info(f'Config used: {default_config}')
 
     additional_files_to_link.append(get_tmp(suffix='.o'))
     entry_stub_file = os.path.abspath(os.path.join(os.path.dirname(sys.argv[0]) + '/libipe/stubs/', default_config['entry_stub']))

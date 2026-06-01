@@ -112,7 +112,6 @@ class IPECollector(c_ast.NodeVisitor):
                             'index': self.index,
                             'bitmap': hex(int(make_bitmap(return_regs), 2)),
                         })
-                        print(self.entry_functions[-1])
                         self.index += 1
                         include_declaration(node.decl, self.generated_header, "")
                         # change declaration name not ecalls, because this way ecall from other file possible
@@ -230,8 +229,17 @@ if __name__ == "__main__":
                 newFile.write(line + "\n")
 
     new_args = sys.argv[1:].copy()
-    new_args[new_args.index('-c') + 1] = out_c
-    new_args[new_args.index('-o') + 1] = f'{file_name}.o'
+    try:
+        new_args[new_args.index('-c') + 1] = out_c
+    except ValueError:
+        error("Only supports modular compilation with -c")
+        exit(1)
+
+    try:    
+        new_args[new_args.index('-o') + 1] = f'{file_name}.o'
+    except ValueError:
+        error("You need to provide an output file with -o")
+        exit(1)
 
     call_prog("msp430-gcc", new_args)
 
