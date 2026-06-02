@@ -1,6 +1,6 @@
 #include "libipe/ipe_support.h"
 
-int ipe_dummy2_outside(int x);
+int ipe_dummy2_outside(uint16_t x);
 
 DECLARE_IPE_STRUCT;
 

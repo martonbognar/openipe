@@ -4,6 +4,7 @@ from common import *
 import copy
 import os
 import sys
+import argparse
 
 from pycparser import c_ast
 from pycparserext import ext_c_parser
@@ -191,6 +192,25 @@ class OcallStubCreator(c_ast.NodeVisitor):
 
 ###################################################################
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description='openIPE compiler')
+    parser.add_argument(
+        '-o',
+        dest='out_file',
+        help='Place the output into file',
+        metavar='file'
+    )
+    parser.add_argument('-c',
+        dest='compile_only',
+        help='Compile and assemble, but do not link',
+        action='store_true'
+    )
+
+    args, _ = parser.parse_known_args()
+    if not args.compile_only:
+        fatal_error("Only supports modular compilation with -c")   
+    elif not args.out_file:
+        fatal_error("You need to provide an output file with -o")
+
     debug(f"openipe-cc {sys.argv[1:]}")
 
     # Run the input C file through the preprocessor
@@ -241,17 +261,8 @@ if __name__ == "__main__":
                 newFile.write(line + "\n")
 
     new_args = sys.argv[1:].copy()
-    try:
-        new_args[new_args.index('-c') + 1] = out_c
-    except ValueError:
-        error("Only supports modular compilation with -c")
-        exit(1)
-
-    try:    
-        new_args[new_args.index('-o') + 1] = f'{file_name}.o'
-    except ValueError:
-        error("You need to provide an output file with -o")
-        exit(1)
+    new_args[new_args.index('-c') + 1] = out_c
+    new_args[new_args.index('-o') + 1] = f'{file_name}.o'
 
     call_prog("msp430-gcc", new_args)
 
