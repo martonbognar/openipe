@@ -39,7 +39,11 @@ docker compose run --remove-orphans openipe
 
 Check (and if desired, modify) the list of mounted directories in [`docker-compose.yaml`](./docker-compose.yaml), which will allow you to synchronize files between the container and your local file system.
 
-You can also build the image locally if you'd like to modify the [`Dockerfile`](./Dockerfile).
+You can also build the image locally if you'd like to modify the [`Dockerfile`](./Dockerfile):
+
+```shell
+docker compose run --remove-orphans openipe_local
+```
 
 ### Manual setup
 

@@ -11,3 +11,16 @@ services:
       - ./logs:/openipe/logs
       - ./scripts:/openipe/scripts
     command: "/bin/bash"
+  openipe_local:
+    build:
+      context: .
+    container_name: openipe_local
+    restart: "no"
+    stdin_open: true
+    tty: true
+    working_dir: /openipe
+    volumes:
+      - ./core:/openipe/core
+      - ./logs:/openipe/logs
+      - ./scripts:/openipe/scripts
+    command: "/bin/bash"
