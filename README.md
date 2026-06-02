@@ -5,12 +5,13 @@
 ---
 
 # openIPE: An Extensible Memory Isolation Framework for Microcontrollers
+
 [![Build Status](https://github.com/martonbognar/openipe/actions/workflows/ci.yaml/badge.svg)](https://github.com/martonbognar/openipe/actions/workflows/ci.yaml)
  [![License](https://img.shields.io/badge/License-BSD_3--Clause-blue.svg)](https://opensource.org/licenses/BSD-3-Clause)
 ![Docker pulls](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fghcr-badge.elias.eu.org%2Fapi%2Fmartonbognar%2Fopenipe%2Fopenipe&query=downloadCount&label=Docker+pulls&logo=github)
 
 This repository contains [openIPE](https://mici.hu/papers/bognar25openipe.pdf), a microcontroller design based on [openMSP430](https://github.com/olgirard/openmsp430), implementing Texas Instruments' [Intellectual Property Encapsulation (IPE)](https://www.ti.com/lit/an/slaa685/slaa685.pdf#page=9) memory isolation feature and featuring a firmware layer that can be used to implement various security-critical features.
-Aside from the source code of the microcontroller and applications, the repository contains a unit-test suite and uses a symbolic-execution tool to validate properties of either IPE application or firmware code.
+Aside from the source code of the microcontroller and applications, the repository contains a unit test suite and uses a symbolic execution tool to validate properties of either IPE application or firmware code.
 
 If you extend or improve upon our work, please consider submitting a pull request and cite openIPE as the following:
 
@@ -28,38 +29,25 @@ For a complete introduction to this work, we also strongly encourage reading our
 ## Installation
 
 ### Docker setup
-We recommend using [Docker](https://www.docker.com/).
-This latest container image containing all dependencies and setup code can be retrieved as follows:
 
-```
-$ docker pull ghcr.io/martonbognar/openipe:latest
-```
-
-Once the image is pulled, you can start a new instance with the `core` directory mounted as a volume.
-This will allow you to edit the source files on your own machine and execute scripts on them inside the container.
+We recommend using [Docker Compose](https://docs.docker.com/compose/) for the development environment.
+You can launch a development container with the following command:
 
 ```shell
-$ docker run -it -v ./core:/openipe/core openipe:latest /bin/bash
+docker compose run --remove-orphans openipe
+```
 
-```
-### Docker compose setup
-You can also use [Docker Compose](https://docs.docker.com/compose/) to set up the development environment.
-See the provided `docker-compose.yaml` file for an example configuration.
-You can start a new container with the following command:
-```shell
-$ docker compose up -d
-```
-You can then access the container's shell with:
-```shell
-$ docker exec -it openipe /bin/bash
-```
+Check (and if desired, modify) the list of mounted directories in [`docker-compose.yaml`](./docker-compose.yaml), which will allow you to synchronize files between the container and your local file system.
+
+You can also build the image locally if you'd like to modify the [`Dockerfile`](./Dockerfile).
 
 ### Manual setup
+
 Alternatively, you can follow the steps in the [Dockerfile](Dockerfile) to set up the dependencies on your own machine.
 
 ## Basic functionality
 
-To enable easy reproduction of the most important results and to provide an easy way of getting started with the codebase, we provide top-level scripts in the `openipe` directory of the Docker image (and the root of this repository).
+To enable easy reproduction of the most important results and to provide an easy way of getting started with the codebase, we provide top-level scripts in the `scripts` directory.
 These scripts can be used as a starting point for running more advanced examples and are detailed in the following sections.
 
 ### Unit test suite
