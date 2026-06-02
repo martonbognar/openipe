@@ -95,6 +95,7 @@ class IPECollector(c_ast.NodeVisitor):
         self.ipe_functions = {}
         self.inline_functions = {}
         self.entry_functions = []
+        self.entry_functions_names = []
         self.ast = ast
 
     def _check_attributes(self, decl, node=None):
@@ -123,6 +124,7 @@ class IPECollector(c_ast.NodeVisitor):
                             'index': self.index,
                             'bitmap': hex(int(make_bitmap(return_regs), 2)),
                         })
+                        self.entry_functions_names.append(function_name)
                         self.index += 1
 
                         # change declaration name not ecalls, because this way ecall from other file possible
@@ -141,9 +143,10 @@ class IPECollector(c_ast.NodeVisitor):
 
 # register all ocalls in IPE function + redirect ocall to new stub
 class OcallCollector(c_ast.NodeVisitor):
-    def __init__(self, ipe_functions, inline_functions):
+    def __init__(self, ipe_functions, inline_functions, ipe_entries_names):
         self.ipe_functions = ipe_functions
         self.inline_functions = inline_functions
+        self.ipe_entries_names = ipe_entries_names
         self.ocall_functions = {}
         self.ocall_detected = False
 
@@ -157,6 +160,8 @@ class OcallCollector(c_ast.NodeVisitor):
             self.ocall_functions[funcName] = node
             # change ocalls not declaration, because unprotected --> unprotected calls should not go through stub
             node.name.name += "_stub"
+        if funcName in self.ipe_functions and funcName in self.ipe_entries_names:
+            node.name.name += "_internal"
 
 # for all ocalls in IPE:
 #   write a protected stub
@@ -241,7 +246,7 @@ if __name__ == "__main__":
     info(f"Found ecalls: {[e['external_name'] for e in ipe_collector.entry_functions]}")
 
     # Redirect all IPE->untrusted calls (ocalls) through stub
-    ocall_collector = OcallCollector(ipe_collector.ipe_functions, ipe_collector.inline_functions)
+    ocall_collector = OcallCollector(ipe_collector.ipe_functions, ipe_collector.inline_functions, ipe_collector.entry_functions_names)
     for ipe_fn in ipe_collector.ipe_functions.values():
         if ipe_fn:
             ocall_collector.ocall_detected = False
