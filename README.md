@@ -42,7 +42,7 @@ Check (and if desired, modify) the list of mounted directories in [`docker-compo
 You can also build the image locally if you'd like to modify the [`Dockerfile`](./Dockerfile):
 
 ```shell
-docker compose run --remove-orphans openipe_local
+docker compose run --build --remove-orphans openipe_local
 ```
 
 ### Manual setup
