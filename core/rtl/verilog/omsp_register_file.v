@@ -100,7 +100,7 @@ output        [3:0] status;       // R2 Status {V,N,Z,C}
 // INPUTs
 //=========
 `ifndef OMIT_SP_SWITCHING
-input               ipe_exec;
+input         [3:0] ipe_exec;
 input               irq_detect;
 input               bootcode_exec;
 `endif
@@ -171,13 +171,16 @@ wire       mclk_r1            = mclk;
 
 `ifndef OMIT_SP_SWITCHING
   reg [15:0] r1_ipe;
+  reg [15:0] r1_ipe2;
+  reg [15:0] r1_ipe3;
+  reg [15:0] r1_ipe4;
 
   reg ipe_exec_irq;
   always @(posedge mclk or posedge puc_rst)
     if (puc_rst) ipe_exec_irq <= 0;
     else if (irq_detect) ipe_exec_irq <= ipe_exec;
 
-  wire use_ipe_sp = ipe_exec | (bootcode_exec & ipe_exec_irq);
+  wire [3:0] use_ipe_sp = {ipe_exec[3] | (bootcode_exec & ipe_exec_irq), ipe_exec[2] | (bootcode_exec & ipe_exec_irq), ipe_exec[1] | (bootcode_exec & ipe_exec_irq), ipe_exec[0] | (bootcode_exec & ipe_exec_irq)};
 `endif
 
 // Switching between IPE and untrusted stack pointer
@@ -185,7 +188,10 @@ wire [15:0] r1_nxt = r1_wr     ? reg_dest_val_in & 16'hfffe :
 	             reg_sp_wr ? reg_sp_val      & 16'hfffe :
 		     r1_inc    ? reg_incr_val    & 16'hfffe :
 `ifndef OMIT_SP_SWITCHING
-		     use_ipe_sp  ? r1_ipe :
+		     use_ipe_sp[0]  ? r1_ipe :
+         use_ipe_sp[1]  ? r1_ipe2 :
+         use_ipe_sp[2]  ? r1_ipe3 :
+         use_ipe_sp[3]  ? r1_ipe4 :
 `endif
          r1;
 
@@ -194,11 +200,20 @@ always @(posedge mclk or posedge puc_rst)
       r1 <= 16'h0000;
 `ifndef OMIT_SP_SWITCHING
       r1_ipe <= 16'h0000;
+      r1_ipe2 <= 16'h0000;
+      r1_ipe3 <= 16'h0000;
+      r1_ipe4 <= 16'h0000;
 `endif
   end
 `ifndef OMIT_SP_SWITCHING
-  else if (use_ipe_sp)
+  else if (use_ipe_sp[0])
       r1_ipe <= r1_nxt;
+  else if (use_ipe_sp[1])
+      r1_ipe2 <= r1_nxt;
+  else if (use_ipe_sp[2])
+      r1_ipe3 <= r1_nxt;
+  else if (use_ipe_sp[3])
+      r1_ipe4 <= r1_nxt;
 `endif
   else
       r1 <= r1_nxt;
@@ -614,7 +629,10 @@ always @(posedge mclk_r15 or posedge puc_rst)
 assign reg_src  = (r0      & {16{inst_src_in[0]}})   |
 `ifndef OMIT_SP_SWITCHING
                   (r1      & {16{inst_src_in[1]}} & {16{!use_ipe_sp}}) |
-                  (r1_ipe  & {16{inst_src_in[1]}} & {16{use_ipe_sp}})  |
+                  (r1_ipe  & {16{inst_src_in[1]}} & {16{use_ipe_sp[0]}})  |
+                  (r1_ipe2  & {16{inst_src_in[1]}} & {16{use_ipe_sp[1]}})  |
+                  (r1_ipe3  & {16{inst_src_in[1]}} & {16{use_ipe_sp[2]}})  |
+                  (r1_ipe4  & {16{inst_src_in[1]}} & {16{use_ipe_sp[3]}})  |
 `else
                   (r1      & {16{inst_src_in[1]}})   |
 `endif
@@ -636,7 +654,10 @@ assign reg_src  = (r0      & {16{inst_src_in[0]}})   |
 assign reg_dest = (r0      & {16{inst_dest[0]}})  |
 `ifndef OMIT_SP_SWITCHING
                   (r1      & {16{inst_dest[1]}} & {16{!use_ipe_sp}}) |
-                  (r1_ipe  & {16{inst_dest[1]}} & {16{use_ipe_sp}})  |
+                  (r1_ipe  & {16{inst_dest[1]}} & {16{use_ipe_sp[0]}})  |
+                  (r1_ipe2  & {16{inst_dest[1]}} & {16{use_ipe_sp[1]}})  |
+                  (r1_ipe3  & {16{inst_dest[1]}} & {16{use_ipe_sp[2]}})  |
+                  (r1_ipe4  & {16{inst_dest[1]}} & {16{use_ipe_sp[3]}})  |
 `else
                   (r1      & {16{inst_dest[1]}})  |
 `endif

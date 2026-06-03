@@ -11,13 +11,13 @@ initial
 
       /* checkpoint 1 */
       @(r12 == 16'hCAFE);
-      if (bmem_0.mem[0] !== 16'h9382)
+      if (bmem_0.mem[0] !== 16'h403a)
          tb_error("====== unexpected bootcode start value ======");
 
 
       /* ----------------------  END OF TEST --------------- */
       @(r0==16'hFFFF);
-      if (bmem_0.mem[0] !== 16'h9382)
+      if (bmem_0.mem[0] !== 16'h403a)
          tb_error("====== bootcode overwritten ======");
 
       stimulus_done = 1;

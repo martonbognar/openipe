@@ -1,0 +1,485 @@
+.include "../bin/ipe_macros.asm"
+.include "pmem_defs.asm"
+
+    /*
+     * "Two IPE signatures, IPE Signature 1 (memory location 0FF88h) and IPE
+     * Signature 2 (memory location 0FF8Ah), reside in FRAM and can be used to
+     * control the initialization of the IP Encapsulation. Write 0xAAAA to IPE
+     * Signature 1 to trigger the evaluation of the IPE Signature 2 as the IPE
+     * structure pointer." [slau367p]
+     */
+.set IPE_SIG_VALID_SRC,      (0xFF88)
+.set IPE_STRUCT_POINTER_SRC, (0xFF8A)
+.set IPE_SIG_VALID_SRC2,     (0xFF8C)
+.set IPE_STRUCT_POINTER_SRC2,(0xFF8E)
+.set IPE_SIG_VALID_SRC3,     (0xFF90)
+.set IPE_STRUCT_POINTER_SRC3,(0xFF92)
+.set IPE_SIG_VALID_SRC4,     (0xFF94)
+.set IPE_STRUCT_POINTER_SRC4,(0xFF96)
+.set IPE_ISR_SRC1,           (0xFF98)
+.set IPE_ISR_SRC2,           (0xFF9a)
+.set IPE_ISR_SRC3,           (0xFF9c)
+.set IPE_ISR_SRC4,           (0xFF9e)
+.set VALID_FLAG,             (0xAAAA)
+.set VALID_FLAG_ISR,         (0xAAAB)
+
+
+    /*
+     * "On bootcode execution, a valid IPE Signature 1 triggers the transfer of
+     * the IPE Signature 2 (IPE structure pointer source) to a secured
+     * nonvolatile system data area (saved IPE structure pointer). This
+     * transfer only happens once if no previous secured IPE structure pointer
+     * exists." [slau367p]
+     */
+    .section .fw_trampoline, "a"
+trampoline:
+    br &0xFFFE
+
+
+    .sect ".bootcode", "a"
+start_bootcode:
+    mov #IPE_SIG_VALID_SRC, r10        
+    mov #0, r11
+    mov #0, &ipe_cnt
+    mov #saved_ptrs, r12
+    mov #active_ipe, r13
+struct_check_loop:
+    cmp #4, r11
+    jeq border_check
+    tst 0(r12)                          ;; test if saved_ptrs already contains a non-zero pointer
+    jnz check_struct
+    mov 0(r10), r15
+    rra r15
+    mov #VALID_FLAG, r14            ;; Check if flag is equals 5555 (AAAA >> 1) (full flag could be AAAA or AAAB)
+    rra r14
+    cmp r14, r15             ;; check if the valid flag is set for the struct
+    jnz skip_check
+    mov 2(r10), 0(r12)
+    mov r11, 0(r13)
+    incd r13
+check_struct:
+    mov 0(r12), r6                      ;; check if the checksum in the ipe struct is correct
+    mov #0xFFFF, r14
+    xor @r6+, r14
+    xor @r6+, r14
+    xor @r6+, r14
+    cmp @r6, r14
+    jnz mass_erase_init
+    inc &ipe_cnt
+    incd r12
+skip_check:
+    inc r11
+    add #4, r10
+    jmp struct_check_loop
+
+
+border_check:
+    tst &ipe_cnt
+    jz end    
+    mov #saved_ptrs, r10          ;; check if the upper boundaries are strictly larger than the lower boundaries
+    mov #0, r11
+border_check_loop:
+    cmp &ipe_cnt, r11
+    jeq check_for_overlap
+    mov 0(r10), r12
+    cmp 2(r12), 4(r12)
+    jhs mass_erase_init
+    incd r10
+    inc r11
+    jmp border_check_loop
+
+
+
+check_for_overlap:
+    cmp #1, &ipe_cnt
+    jeq setup_regions
+    mov #0, r10
+    mov #saved_ptrs, r11
+overlap_outer_loop:
+    cmp &ipe_cnt, r10
+    jeq setup_regions
+    mov 0(r11), r12             ; address of next ipe region in list in r12
+    mov #saved_ptrs, r13      ; 2nd pointer to list of pointers to ipe regions in r13
+    mov r10, r15
+    inc r15
+    add r15, r13
+    add r15, r13
+overlap_inner_loop:
+    cmp &ipe_cnt, r15
+    jeq overlap_inner_loop_end
+    mov 0(r13), r14         
+    cmp 2(r14), 4(r12)      ; check if upper border of second region is greater than lower border of first region
+    jhs skip_overlap_check
+    cmp 2(r12), 4(r14)      ; check if lower border of second region is smaller than upper border of first region
+    jhs skip_overlap_check
+    jmp mass_erase_init
+skip_overlap_check:
+    inc r15
+    incd r13
+    jmp overlap_inner_loop
+overlap_inner_loop_end:
+    inc r10
+    incd r11
+    jmp overlap_outer_loop
+
+
+
+
+setup_regions:              ;; write the ipe region registers
+    mov #saved_ptrs, r10
+    mov #0, r11
+    mov #MPUIPC0, r12
+    mov #active_ipe, r14
+setup_loop:
+    cmp #4, r11
+    jeq setup_isr
+    cmp r11, 0(r14)         ;; Make sure the regions are allocated correct numerically
+    jnz skip_setup
+    mov 0(r10), r13
+    mov 4(r13), 4(r12)
+    mov 2(r13), 2(r12)
+    mov 0(r13), 0(r12)
+    incd r10
+    incd r14
+skip_setup:
+    inc r11
+    add #8, r12
+    jmp setup_loop
+
+setup_isr:
+    mov #1, r11                             ;; one hot ipe identifier
+    mov #IPE_SIG_VALID_SRC, r10
+    mov #IPE_ISR_SRC1, r13            ;; get address of 2nd struct source
+    mov #registered_handlers_per_region, r9
+setup_isr_loop:
+    cmp #VALID_FLAG_ISR, 0(r10)      ;; check if flag equals AAAB, which means it wants to register own isr 
+    jnz end_register_loop
+    
+register_isr:
+    mov #0x1, r8                            ;; one-hot encoded irq num counter
+    mov #0, r12                             ;; irq num counter
+    mov 0(r13), r15
+    mov 0(r15), r14                         ;; get one hot encoded array of isrs from struct
+register_loop:
+    cmp #16, r12
+    jeq end_register_loop
+    rra r14                                 ;; right shift the isr array
+    jnc skip_register                       ;; if there is a carry, the isr with number r12 needs to be registered
+    tst.b ivt_jump_in_ipe(r12)                ;; check if no handler is already registered
+    jnz skip_register                       
+    mov.b r11, ivt_jump_in_ipe(r12)           ;; register r11 in the ivt table
+    bis r8, 0(r9)                           ;; track succesfully registered handlers per region
+skip_register:
+    rla r8
+    inc r12                                 ;; increment irq number
+    tst r14                                 ;; if isr array is already empty, continue with next ipe enclave 
+    jz end_register_loop
+    jmp register_loop
+end_register_loop:
+    add #4, r10                             ;; take address of valid flag of next ipe enclave
+    rla r11                                 ;; shift one hot ipe id to left   
+    add #2, r13                             ;; get address of next 2nd struct
+    incd r9
+    cmp #0x10, r11                
+    jeq end
+    jmp setup_isr_loop
+
+
+    
+
+ 
+
+
+
+    /*
+    * "An invalid IP Encapsulation init structure or a saved IPE structure pointer
+    * with an invalid target (not pointing to a valid IP Encapsulation init
+    * structure) causes an erase of all nonvolatile memory segments including the
+    * IP Encapsulation segments and the init structure during bootcode execution"
+    * [slau367p]
+    */
+mass_erase_init:
+    mov #PMEM_BASE, r6
+
+mass_erase_loop:
+    clr @r6
+    add #2, r6
+    jnc mass_erase_loop
+    mov #ipe_cnt, r10            ; clear saved pointer only after the device has been erased
+clr_ptrs:    
+    clr @r10
+    sub #2, r10
+    tst &active_ipe
+    jz end 
+    jmp clr_ptrs
+
+
+end:
+    mov #16, &bootcode_irq_num  ; reset IRQ identifier in case it reset mid-IRQ
+    clr r10
+    clr r11
+    clr r12
+    clr r13
+    jmp trampoline
+
+    ; secured nonvolatile system data area
+active_ipe:
+    .word 0,0,0,0
+saved_ptrs:
+    .word 0,0,0,0
+ipe_cnt:
+    .word 0
+
+/* ************************************************************************* */
+
+bootcode_isr_0:
+    mov #0, &bootcode_irq_num
+    nop  ; artisanal compensation for the one cycle reduction of the constant generator
+    jmp bootcode_isr
+bootcode_isr_1:
+    mov #1, &bootcode_irq_num
+    nop  ; artisanal compensation for the one cycle reduction of the constant generator
+    jmp bootcode_isr
+bootcode_isr_2:
+    mov #2, &bootcode_irq_num
+    nop  ; artisanal compensation for the one cycle reduction of the constant generator
+    jmp bootcode_isr
+bootcode_isr_3:
+    mov #3, &bootcode_irq_num
+    jmp bootcode_isr
+bootcode_isr_4:
+    mov #4, &bootcode_irq_num
+    nop  ; artisanal compensation for the one cycle reduction of the constant generator
+    jmp bootcode_isr
+bootcode_isr_5:
+    mov #5, &bootcode_irq_num
+    jmp bootcode_isr
+bootcode_isr_6:
+    mov #6, &bootcode_irq_num
+    jmp bootcode_isr
+bootcode_isr_7:
+    mov #7, &bootcode_irq_num
+    jmp bootcode_isr
+bootcode_isr_8:
+    mov #8, &bootcode_irq_num
+    nop  ; artisanal compensation for the one cycle reduction of the constant generator
+    jmp bootcode_isr
+bootcode_isr_9:
+    mov #9, &bootcode_irq_num
+    jmp bootcode_isr
+bootcode_isr_10:
+    mov #10, &bootcode_irq_num
+    jmp bootcode_isr
+bootcode_isr_11:
+    mov #11, &bootcode_irq_num
+    jmp bootcode_isr
+bootcode_isr_12:
+    mov #12, &bootcode_irq_num
+    jmp bootcode_isr
+bootcode_isr_13:
+    mov #13, &bootcode_irq_num
+    jmp bootcode_isr
+bootcode_isr_14:
+    mov #14, &bootcode_irq_num
+    jmp bootcode_isr
+bootcode_isr_15:
+    mov #15, &bootcode_irq_num
+    jmp bootcode_isr
+
+bootcode_isr:
+    mov #0x0, &TACTL ; reset timer (this PoC only works for Nemesis through Timer A, but this could be extended to take the IRQ number into account)
+    mov &bootcode_irq_num, &IRQ_NUM ; use a dedicated temporary location for later calculations
+    mov #16, &bootcode_irq_num ; restore counter for next IRQ
+
+    tst &IPE_ACTIVE
+    jz from_untrusted
+
+from_ipe:
+    ; If we continue executing here, the interrupted code ran in IPE
+
+    ; push registers to IPE stack and clear (this needs to be done in the same order as in the IPE calling conventions)
+    push_all_regs
+
+    ; 18 cycles pass between the start of IRQ and TAR being stopped, we need to calculate how many more cycles happened before
+    ; but it happens in cycles of TACCR0+1
+
+    mov &TAR, r15
+    clr &TAR  ; clear TAR to avoid leaks
+
+calc_offset:
+    ; take modulo 6 of TAR
+    cmp #19, r15
+    jge calc_offset_done
+    add &TACCR0, r15
+    add #1, r15
+    jmp calc_offset
+
+calc_offset_done:
+    sub #18, r15
+    ; save number of padding cycles to IPE to perform exit padding
+    get_ipe_end_mult r14
+    mov r15, -34(r14)
+    ; shift 2 => offset
+    add r15, r15
+    add #nemesis_slide, r15
+    br r15
+
+nemesis_slide:
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+
+    ; check if handler is also in IPE
+    mov &IRQ_NUM, r15
+    cmp.b &IPE_ACTIVE, ivt_jump_in_ipe(r15)
+    jeq from_ipe_to_ipe
+
+    tst.b ivt_jump_in_ipe(r15)
+    jz from_ipe_to_untrusted
+    jmp trampoline
+
+from_ipe_to_ipe:
+
+    ; we interrupted IPE and will handle in IPE, can just jump there
+    ; we should have a test case for this as well
+
+    mov #-1, r7
+    mov &IRQ_NUM, r8  ; identifier of ISR in r8
+
+    mov #1, r9 ; reach ocall_ret 
+
+    get_ipe_entry_mult r15
+    cmp #PMEM_BASE, r15
+    jlo invalid_isr_address
+    br r15
+
+from_ipe_to_untrusted:
+    ; we interrupted IPE and it will be handled in untrusted code
+
+    clear_all_regs
+
+    ; save address of untrusted handler in IRQ_NUM
+    mov &IRQ_NUM, r10
+    add r10, r10 ; r10 = IRQ * 2
+    mov r10, r15
+    add #0xffe0, r15  ; get address from untrusted IVT
+    mov @r15, &IRQ_NUM
+    mov @r15, r5
+
+    ; get trampoline function to jump to untrusted code
+    get_ipe_end_mult r14
+    sub #0x20, r14
+    add r10, r14
+    mov @r14, r14 ; take address from IPE IVT ; TODO: update this comment
+
+    cmp #PMEM_BASE, r14
+    jlo invalid_isr_address
+    br r14
+
+from_untrusted:
+    /*
+     * If we continue executing here, the interrupted code was unprotected
+     */
+
+    ; check if handler is also in untrusted
+    push r15
+    mov &IRQ_NUM, r15
+    tst.b ivt_jump_in_ipe(r15)
+    pop r15
+
+    jz from_untrusted_to_untrusted
+
+from_untrusted_to_ipe:
+    ; back up registers on the unprotected stack
+    push_all_regs
+
+    mov #-1, r7
+    mov &IRQ_NUM, r8  ; identifier of ISR in r8
+
+    mov #0, r9 ; use untrusted stack to reach trampoline
+
+    mov r8, r15
+    add r15, r15
+    add #0xffe0, r15  ; get address from untrusted IVT
+    push @r15 ;; TODO: why??
+
+    push r8
+    mov.b ivt_jump_in_ipe(r8), r8
+    get_specific_ipe_entry r15, r8
+    pop r8
+    cmp #PMEM_BASE, r15
+    jlo invalid_isr_address
+    br r15
+
+from_untrusted_to_untrusted:
+    push r15
+    mov &IRQ_NUM, r15
+    add r15, r15
+    add #0xffe0, r15  ; get address from untrusted IVT
+    mov @r15, &IRQ_NUM
+    pop r15
+    cmp #PMEM_BASE, &IRQ_NUM
+    jlo invalid_isr_address
+    br &IRQ_NUM
+
+invalid_isr_address:
+    jmp trampoline
+
+
+
+
+/* ************************************************************************* */
+    ; secured nonvolatile system data area
+bootcode_irq_num:
+    .word 16
+
+; possible space saving: reduce to a 16-bit vector
+ivt_jump_in_ipe:
+    .byte 0
+    .byte 0
+    .byte 0
+    .byte 0
+    .byte 0
+    .byte 0
+    .byte 0
+    .byte 0
+    .byte 0
+    .byte 0
+    .byte 0
+    .byte 0
+    .byte 0
+    .byte 0
+    .byte 0
+    .byte 0
+
+padding:
+    .word 0,0,0,0,0,0,0,0,0,0,0,0,0,0
+
+registered_handlers_per_region:
+    .word 0
+    .word 0
+    .word 0
+    .word 0
+
+    .sect ".bootcode_ivt", "a"
+bootcode_ivt:
+   .word bootcode_isr_0
+   .word bootcode_isr_1
+   .word bootcode_isr_2
+   .word bootcode_isr_3
+   .word bootcode_isr_4
+   .word bootcode_isr_5
+   .word bootcode_isr_6
+   .word bootcode_isr_7
+   .word bootcode_isr_8
+   .word bootcode_isr_9
+   .word bootcode_isr_10
+   .word bootcode_isr_11
+   .word bootcode_isr_12
+   .word bootcode_isr_13
+   .word bootcode_isr_14
+   .word bootcode_isr_15

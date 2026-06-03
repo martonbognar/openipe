@@ -111,7 +111,7 @@ output              scg1;          // System clock generator 1. Turns off the SM
 // INPUTs
 //=========
 `ifndef OMIT_SP_SWITCHING
-input               ipe_exec;
+input         [3:0] ipe_exec;
 input		    irq_detect;
 input               bootcode_exec;
 `endif

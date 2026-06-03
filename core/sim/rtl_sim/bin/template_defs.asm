@@ -128,6 +128,15 @@
 .set    MPUIPC0,    0x05AA
 .set    MPUIPSEGB2, 0x05AC
 .set    MPUIPSEGB1, 0x05AE
+.set    MPUIP2C0,   0x05B2
+.set    MPUIP2SEGB2,0x05B4
+.set    MPUIP2SEGB1,0x05B6
+.set    MPUIP3C0,   0x05BA
+.set    MPUIP3SEGB2,0x05BC
+.set    MPUIP3SEGB1,0x05BE 
+.set    MPUIP4C0,   0x05C2
+.set    MPUIP4SEGB2,0x05C4
+.set    MPUIP4SEGB1,0x05C6 
 
 /*---------------------------------------------------------------------------*/
 /*                          DATA MEMORY MAPPING                              */

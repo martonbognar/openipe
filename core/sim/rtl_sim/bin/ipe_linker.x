@@ -13,7 +13,7 @@ MEMORY
   ipe_seg   (rwx)   : ORIGIN = 0x8000,    LENGTH = 0x6400
   ipe_padding (rw) :  ORIGIN = 0xe3de,    LENGTH = 0x2
   ipe_vectors (rw)  : ORIGIN = 0xe3e0,    LENGTH = 0x20
-  ipe_meta  (rw)    : ORIGIN = 0xff88,    LENGTH = 0x4
+  ipe_meta  (rw)    : ORIGIN = 0xff88,    LENGTH = 0x18
   vectors64 (rw)    : ORIGIN = 0xff80,    LENGTH = 0x40
   vectors32 (rw)    : ORIGIN = 0xffc0,    LENGTH = 0x20
   vectors   (rw)    : ORIGIN = 0xffe0,    LENGTH = 0x20
@@ -418,3 +418,13 @@ __IPE_ACTIVE = 0x05A8;
 __MPUIPC0 =    0x05AA;
 __MPUIPSEGB2 = 0x05AC;
 __MPUIPSEGB1 = 0x05AE;
+__MPUIP2C0 =    0x05B2;
+__MPUIP2C0 =    0x05B2;
+__MPUIP2SEGB2 = 0x05B4;
+__MPUIP2SEGB1 = 0x05B6;
+__MPUIP3C0  =  0x05BA;
+__MPUIP3SEGB2 = 0x05BC;
+__MPUIP3SEGB1 = 0x05BE;
+__MPUIP4C0 =   0x05C2;
+__MPUIP4SEGB2 = 0x05C4;
+__MPUIP4SEGB1 = 0x05C6;

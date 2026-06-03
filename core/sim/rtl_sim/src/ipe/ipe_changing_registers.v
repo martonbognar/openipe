@@ -12,13 +12,13 @@ initial
       repeat(5) @(posedge mclk);
       stimulus_done = 0;
 
-
       /* checkpoint 1 */
       @(r12 == 16'hCAFE);
       if (r15!==16'h3FFF)
          tb_error("====== secret not protected ======");
       if (r14!==16'd43)
          tb_error("====== secret2 incorrect ======");
+
 
       /* checkpoint 2 */
       @(r12 == 16'hBEEF);

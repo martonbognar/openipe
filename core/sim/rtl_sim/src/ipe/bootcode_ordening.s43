@@ -1,0 +1,66 @@
+.include "pmem_defs.asm"
+
+    .global main
+    .sect .text
+
+main:
+    nop
+    
+        /* ----------------------         END OF TEST        --------------- */
+end_of_test:
+    nop
+    br #0xffff
+
+
+
+
+    .sect .ipe_seg, "a"
+struct1:
+    .word 0x00E0, 0x0840, 0x0800, 0xFF5F
+
+    .org struct1 + 0x400
+
+struct2:
+    .word 0x00E0, 0x0880, 0x0840, 0xFFDF
+
+    .org struct2 + 0x400
+
+struct3:
+    .word 0x00E0, 0x08C0, 0x0880, 0xFF5F
+
+    .org struct3 + 0x400
+
+struct4:
+    .word 0x00E0, 0x0900, 0x08C0, 0xFEDF
+
+
+.section .ipe_meta, "a"
+    .word 0xAAAA
+    .word struct4
+    .word 0xAAAA
+    .word struct3
+    .word 0xAAAA
+    .word struct2
+    .word 0xAAAA
+    .word struct1
+
+        /* ----------------------         INTERRUPT VECTORS  --------------- */
+
+.section .vectors, "a"
+.word end_of_test    ; Interrupt  0 (lowest priority)    <unused>
+.word end_of_test    ; Interrupt  1                      <unused>
+.word end_of_test    ; Interrupt  2                      <unused>
+.word end_of_test    ; Interrupt  3                      <unused>
+.word end_of_test    ; Interrupt  4                      <unused>
+.word end_of_test    ; Interrupt  5                      <unused>
+.word end_of_test    ; Interrupt  6                      <unused>
+.word end_of_test    ; Interrupt  7                      <unused>
+.word end_of_test        ; Interrupt  8                      <unused>
+.word end_of_test    ; Interrupt  9                      <unused>
+.word end_of_test    ; Interrupt 10                      Watchdog timer
+.word end_of_test    ; Interrupt 11                      <unused>
+.word end_of_test    ; Interrupt 12                      <unused>
+.word end_of_test    ; Interrupt 13                      <unused>
+.word end_of_test    ; Interrupt 14                      NMI
+rst_vector:
+.word main           ; Interrupt 15 (highest priority)   RESET

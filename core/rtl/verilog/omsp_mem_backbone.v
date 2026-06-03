@@ -340,7 +340,7 @@ wire               fe_pmem_wait  = (fe_pmem_en & eu_pmem_en) | (fe_bmem_en & eu_
 
 // Execution unit access
 wire               eu_per_sel    =  (eu_mab<(`PER_SIZE>>1));
-wire               eu_per_en     =  eu_mb_en & eu_per_sel;
+wire               eu_per_en     =  eu_mb_en & eu_per_sel & ~ipe_eu_violation;
 
 // Front-end access
 // -- not allowed to execute from peripherals memory space --

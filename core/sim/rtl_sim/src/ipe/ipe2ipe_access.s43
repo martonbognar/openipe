@@ -1,0 +1,126 @@
+; Code from inside the IPE region can access protected data but not data from a different IPE region.
+
+.include "pmem_defs.asm"
+
+    .global main
+    .sect .text
+main:
+    mov #DMEM_220, r1
+
+    br #ipe_code
+cont:
+    mov #0xCAFE, r10       ;; checkpoint 1
+    br #ipe_code2
+cont2:
+    mov #0xBEEF, r10       ;; checkpoint 2
+    br #ipe_code3
+cont3:
+    mov #0xDEAD, r10       ;; checkpoint 3
+    br #ipe_code4
+    
+
+        /* ----------------------         END OF TEST        --------------- */
+end_of_test:
+    nop
+    br #0xffff
+
+    .sect .ipe_seg, "a"
+ipe_struct:
+    .word 0x00E0, 0x0840, 0x0800, 0xFF5F
+ipe_code:
+    inc &secret
+    mov &secret, r12
+    inc &secret2
+    mov &secret2, r13
+    inc &secret3
+    mov &secret3, r14
+    inc &secret4
+    mov &secret4, r15
+    br #cont
+
+secret:
+    .word 42
+
+    .org ipe_struct + 0x400
+ipe_struct2:
+    .word 0x00E0, 0x0880, 0x0840, 0xFFDF
+ipe_code2:
+    inc &secret
+    mov &secret, r12
+    inc &secret2
+    mov &secret2, r13
+    inc &secret3
+    mov &secret3, r14
+    inc &secret4
+    mov &secret4, r15
+    br #cont2
+
+secret2:
+    .word 52
+
+    .org ipe_struct2 + 0x400
+ipe_struct3:
+    .word 0x00E0, 0x08C0, 0x0880, 0xFF5F
+ipe_code3:
+    inc &secret
+    mov &secret, r12
+    inc &secret2
+    mov &secret2, r13
+    inc &secret3
+    mov &secret3, r14
+    inc &secret4
+    mov &secret4, r15
+    br #cont3
+
+secret3:
+    .word 62
+
+    .org ipe_struct3 + 0x400
+ipe_struct4:
+    .word 0x00E0, 0x0900, 0x08C0, 0xFEDF
+ipe_code4:
+    inc &secret
+    mov &secret, r12
+    inc &secret2
+    mov &secret2, r13
+    inc &secret3
+    mov &secret3, r14
+    inc &secret4
+    mov &secret4, r15
+    br #end_of_test
+
+secret4:
+    .word 72
+
+
+        /* ----------------------        IPE METADATA        --------------- */
+
+.section .ipe_meta, "a"
+    .word 0xAAAA
+    .word ipe_struct
+    .word 0xAAAA
+    .word ipe_struct2 
+    .word 0xAAAA
+    .word ipe_struct3
+    .word 0xAAAA
+    .word ipe_struct4 
+
+        /* ----------------------         INTERRUPT VECTORS  --------------- */
+
+.section .vectors, "a"
+.word end_of_test    ; Interrupt  0 (lowest priority)    <unused>
+.word end_of_test    ; Interrupt  1                      <unused>
+.word end_of_test    ; Interrupt  2                      <unused>
+.word end_of_test    ; Interrupt  3                      <unused>
+.word end_of_test    ; Interrupt  4                      <unused>
+.word end_of_test    ; Interrupt  5                      <unused>
+.word end_of_test    ; Interrupt  6                      <unused>
+.word end_of_test    ; Interrupt  7                      <unused>
+.word end_of_test        ; Interrupt  8                      <unused>
+.word end_of_test    ; Interrupt  9                      <unused>
+.word end_of_test    ; Interrupt 10                      Watchdog timer
+.word end_of_test    ; Interrupt 11                      <unused>
+.word end_of_test    ; Interrupt 12                      <unused>
+.word end_of_test    ; Interrupt 13                      <unused>
+.word end_of_test    ; Interrupt 14                      NMI
+.word main           ; Interrupt 15 (highest priority)   RESET

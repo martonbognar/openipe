@@ -1,0 +1,106 @@
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Test that IPE regions that do not have parentship cannot access memory from
+;; a child region in peripheral memory, while the parent can
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+
+.include "pmem_defs.asm"
+
+    .global main
+
+   .section .ipe_meta, "a"
+    .word 0xAAAA
+    .word ipechildstruct
+    .word 0xAAAA
+    .word ipestruct
+    .word 0xAAAA
+    .word ipestruct2
+
+
+
+
+    .sect .text
+
+main:
+    nop
+    nop
+    eint
+    nop
+    nop
+    nop
+    nop
+    nop
+    br #ipe_entry_1
+continue:
+    mov #0xCAFE, r12
+    nop
+    br #ipe_entry_2
+
+continue2:
+    mov #0xBEEF, r12
+    nop
+    mov #7, &MPY
+    mov #6, &OP2
+    mov &RESLO, r10
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+   
+    
+        /* ----------------------         END OF TEST        --------------- */
+end_of_test:
+    nop
+    br #0xffff
+
+    .sect .ipe_seg, "a"
+ipestruct:
+    .word 0x60, 0x840, 0x800, 0xFFDF
+ipe_entry_1:
+    mov #8, &MPY
+    mov #9, &OP2
+    mov &RESLO, r10
+    nop
+    br #continue
+
+ipechildstruct:
+    .word 0xB60, 0x1FF, 0x100, 0xF460
+
+    .sect .ipe2_seg, "a"
+
+ipestruct2:
+    .word 0x60, 0x9d0, 0x990, 0xFFDF
+ipe_entry_2:
+    mov #4, &MPY
+    mov #3, &OP2
+    mov &RESLO, r10
+    nop
+    br #continue2
+
+
+
+
+        /* ----------------------         INTERRUPT VECTORS  --------------- */
+
+.section .vectors, "a"
+.word end_of_test    ; Interrupt  0 (lowest priority)    <unused>
+.word end_of_test    ; Interrupt  1                      <unused>
+.word end_of_test    ; Interrupt  2                      <unused>
+.word end_of_test    ; Interrupt  3                      <unused>
+.word end_of_test    ; Interrupt  4                      <unused>
+.word end_of_test    ; Interrupt  5                      <unused>
+.word end_of_test    ; Interrupt  6                      <unused>
+.word end_of_test    ; Interrupt  7                      <unused>
+.word end_of_test    ; Interrupt  8                      <unused>
+.word end_of_test    ; Interrupt  9                      <unused>
+.word end_of_test    ; Interrupt 10                      Watchdog timer
+.word end_of_test    ; Interrupt 11                      <unused>
+.word end_of_test    ; Interrupt 12                      <unused>
+.word end_of_test    ; Interrupt 13                      <unused>
+.word end_of_test    ; Interrupt 14                      NMI
+.word main           ; Interrupt 15 (highest priority)   RESET

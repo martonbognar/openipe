@@ -1,0 +1,204 @@
+.include "pmem_defs.asm"
+
+    /*
+     * "Two IPE signatures, IPE Signature 1 (memory location 0FF88h) and IPE
+     * Signature 2 (memory location 0FF8Ah), reside in FRAM and can be used to
+     * control the initialization of the IP Encapsulation. Write 0xAAAA to IPE
+     * Signature 1 to trigger the evaluation of the IPE Signature 2 as the IPE
+     * structure pointer." [slau367p]
+     */
+.set IPE_SIG_VALID_SRC,      (0xFF88)
+.set IPE_STRUCT_POINTER_SRC, (0xFF8A)
+.set IPE_SIG_VALID_SRC2,     (0xFF8C)
+.set IPE_STRUCT_POINTER_SRC2,(0xFF8E)
+.set IPE_SIG_VALID_SRC3,     (0xFF90)
+.set IPE_STRUCT_POINTER_SRC3,(0xFF92)
+.set IPE_SIG_VALID_SRC4,     (0xFF94)
+.set IPE_STRUCT_POINTER_SRC4,(0xFF96)
+.set VALID_FLAG,             (0xAAAA)
+    /*
+     * "On bootcode execution, a valid IPE Signature 1 triggers the transfer of
+     * the IPE Signature 2 (IPE structure pointer source) to a secured
+     * nonvolatile system data area (saved IPE structure pointer). This
+     * transfer only happens once if no previous secured IPE structure pointer
+     * exists." [slau367p]
+     */
+    .sect ".bootcode", "a"
+
+
+
+
+start_bootcode:
+    mov #IPE_SIG_VALID_SRC, r10        
+    mov #0, r11
+    mov #0, &ipe_cnt
+    mov #saved_ptrs, r12
+    mov #active_ipe, r13
+struct_check_loop:
+    cmp #4, r11
+    jeq border_check
+    tst 0(r12)                          ;; test if saved_ptrs already contains a non-zero pointer
+    jnz check_struct
+    ;mov 0(r10), r15
+    ;rra r15
+    ;mov #VALID_FLAG, r14            ;; Check if flag is equals AAA (full flag could be AAAA or AAAB)
+    ;rra r14
+    ;cmp r14, r15             ;; check if the valid flag is set for the struct    
+    cmp #VALID_FLAG, 0(r10)
+    jnz skip_check
+    mov 2(r10), 0(r12)
+    mov r11, 0(r13)
+    incd r13
+check_struct:
+    mov 0(r12), r6                      ;; check if the checksum in the ipe struct is correct
+    mov #0xFFFF, r14
+    xor @r6+, r14
+    xor @r6+, r14
+    xor @r6+, r14
+    cmp @r6, r14
+    jnz mass_erase_init
+    inc &ipe_cnt
+    incd r12
+skip_check:
+    inc r11
+    add #4, r10
+    jmp struct_check_loop
+
+
+border_check:
+    tst &ipe_cnt
+    jz end    
+    mov #saved_ptrs, r10          ;; check if the upper boundaries are strictly larger than the lower boundaries
+    mov #0, r11
+border_check_loop:
+    cmp &ipe_cnt, r11
+    jeq order_ptrs
+    mov 0(r10), r12
+    cmp 2(r12), 4(r12)
+    jhs mass_erase_init
+    incd r10
+    inc r11
+    jmp border_check_loop
+
+
+order_ptrs:                     ;; order the addresses in ordered_ptrs list by the lower boundaries of the regions
+    cmp #1, &ipe_cnt
+    jeq setup_regions
+    mov #0, r10
+    mov #saved_ptrs, r11      ; address of ordered list of pointers to ipe regions in r11
+order_outer_loop: 
+    cmp &ipe_cnt, r10
+    jeq order_outer_loop_end
+
+    mov 0(r11), r12             ; address of next unordered ipe region in list in r12
+    mov #saved_ptrs, r13      ; 2nd pointer to ordered list of pointers to ipe regions in r13
+    mov r10, r15
+    inc r15
+    add r15, r13
+    add r15, r13
+
+ order_inner_loop:
+    cmp &ipe_cnt, r15
+    jeq order_inner_loop_end
+    mov 0(r13), r14               ; store next address of ipe region in r14 
+    mov 0(r11), r12
+    cmp 4(r12), 4(r14)           ; compare lower boundaries of both regions
+    jhs skip_switch
+    mov r14, 0(r11)             ; if smaller, switch out address
+    mov r12, 0(r13)            
+skip_switch:
+    incd r13
+    inc r15
+    jmp order_inner_loop
+order_inner_loop_end:
+    incd r11
+    inc r10
+    jmp order_outer_loop
+    
+order_outer_loop_end:
+
+
+overlap_check:              ;; check if two neighbouring ipe regions do not overlap
+    mov #1, r10
+    mov #saved_ptrs, r11
+overlap_loop:
+    cmp &ipe_cnt, r10
+    jeq setup_regions
+    mov 0(r11), r14
+    mov 2(r11), r15
+    cmp 2(r14), 4(r15)       ; check if upper border of first region is greater than lower border of second region
+    jl mass_erase_init
+    inc r10
+    incd r11
+    jmp overlap_loop
+
+setup_regions:              ;; write the ipe region registers
+    mov #saved_ptrs, r10
+    mov #0, r11
+    mov #MPUIPC0, r12
+    mov #active_ipe, r14
+setup_loop:
+    cmp #4, r11
+    jeq end
+    cmp r11, 0(r14)         ;; Make sure the regions are allocated correct numerically
+    jnz skip_setup
+    tst 0(r10)
+    jz skip_setup
+    mov 0(r10), r13
+    mov 4(r13), 4(r12)
+    mov 2(r13), 2(r12)
+    mov 0(r13), 0(r12)
+    incd r14
+    incd r10
+skip_setup:
+    inc r11
+    add #8, r12
+    jmp setup_loop
+
+
+
+    /*
+    * "An invalid IP Encapsulation init structure or a saved IPE structure pointer
+    * with an invalid target (not pointing to a valid IP Encapsulation init
+    * structure) causes an erase of all nonvolatile memory segments including the
+    * IP Encapsulation segments and the init structure during bootcode execution"
+    * [slau367p]
+    */
+mass_erase_init:
+    mov #PMEM_BASE, r6
+
+mass_erase_loop:
+    clr @r6
+    add #2, r6
+    jnc mass_erase_loop
+    mov #ipe_cnt, r10            ; clear saved pointer only after the device has been erased
+clr_ptrs:    
+    clr @r10
+    sub #2, r10
+    tst &active_ipe
+    jz end 
+    jmp clr_ptrs
+
+end:
+    clr r10
+    clr r11
+    clr r12
+    clr r13
+    jmp trampoline
+
+/* ************************************************************************* */
+    ; secured nonvolatile system data area
+active_ipe:
+    .word 0,0,0,0
+saved_ptrs:
+    .word 0,0,0,0
+ipe_cnt:
+    .word 0
+
+
+
+        /* ------------------  FIRMWARE TRAMPOLINE TO RESET  --------------- */
+
+    .section .fw_trampoline, "a"
+trampoline:
+    br &0xFFFE

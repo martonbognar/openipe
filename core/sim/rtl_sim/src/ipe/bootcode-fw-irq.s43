@@ -189,7 +189,7 @@ nemesis_slide:
 
     ; check if handler is also in IPE
     mov &IRQ_NUM, r15
-    tst.b ivt_jump_in_ipe(r15)
+    tst ivt_jump_in_ipe(r15)
 
     jz from_ipe_to_untrusted
 
@@ -200,6 +200,8 @@ from_ipe_to_ipe:
 
     mov #-1, r7
     mov &IRQ_NUM, r8  ; identifier of ISR in r8
+
+    mov #1, r9; ; reach ocall_ret
 
     get_ipe_entry r15
     cmp #PMEM_BASE, r15
@@ -236,7 +238,7 @@ from_untrusted:
     ; check if handler is also in untrusted
     push r15
     mov &IRQ_NUM, r15
-    tst.b ivt_jump_in_ipe(r15)
+    tst ivt_jump_in_ipe(r15)
     pop r15
 
     jz from_untrusted_to_untrusted
@@ -247,6 +249,8 @@ from_untrusted_to_ipe:
 
     mov #-1, r7
     mov &IRQ_NUM, r8  ; identifier of ISR in r8
+
+    mov #0, r9; ;use untrusted stack to reach trampoline
 
     mov r8, r15
     add r15, r15
@@ -271,6 +275,8 @@ from_untrusted_to_untrusted:
 
 invalid_isr_address:
     jmp trampoline
+
+
 
 
 /* ************************************************************************* */

@@ -106,6 +106,7 @@ trampoline_to_ipe_0:
 
     mov #-1, r7             ; -1: indicate interrupt handling to IPE
     mov &irq_id_in_unp, r8  ; identifier of ISR in r8
+    mov #0, r9
     clr &irq_id_in_unp
     call #ipe_entry
 
@@ -129,6 +130,12 @@ trampoline_to_ipe_0:
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
     .global ecall_table
     .global max_ecall_index
+    .global ecall_table2
+    .global max_ecall_index2
+    .global ecall_table3
+    .global max_ecall_index3
+    .global ecall_table4
+    .global max_ecall_index4
     .sect ".ipe_const", "a"
     .align 2
 ecall_table:
@@ -137,6 +144,34 @@ ecall_table:
 
 max_ecall_index:
     .word 0
+
+    .sect ".ipe2_const", "a"
+    .align 2
+ecall_table2:
+    .word 0
+    .word 0
+
+max_ecall_index2:
+    .word 0
+
+    .sect ".ipe3_const", "a"
+    .align 2
+ecall_table3:
+    .word 0
+    .word 0
+
+max_ecall_index3:
+    .word 0
+
+    .sect ".ipe4_const", "a"
+    .align 2
+ecall_table4:
+    .word 0
+    .word 0
+
+max_ecall_index4:
+    .word 0
+
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; IPE main function

@@ -38,14 +38,14 @@ initial
 
       $write("waiting for IPE call..          ");
       $fflush;
-      @(posedge dut.ipe.ipe_executing);
+      @(posedge (|dut.ipe.ipe_executing));
       $display("\t[OK]");
       tsc1 <= counter;
       repeat(5) @(posedge mclk);
 
       $write("waiting for IPE return..          ");
       $fflush;
-      @(negedge dut.ipe.ipe_executing);
+      @(negedge (|dut.ipe.ipe_executing));
       tsc2 <= counter;
       $display("\t[OK]");
 

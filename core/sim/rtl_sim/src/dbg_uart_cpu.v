@@ -38,6 +38,7 @@
 
    integer my_test;
    integer test_var;
+   integer debug_tmp;
 
 
 initial
@@ -50,6 +51,7 @@ initial
       #1 dbg_en = 1;
       repeat(30) @(posedge mclk);
       stimulus_done = 0;
+      debug_tmp = 0;
 
       // SEND UART SYNCHRONIZATION FRAME
       dbg_uart_tx(DBG_SYNC);
@@ -118,6 +120,7 @@ initial
       if (dbg_uart_buf !== 16'h0004)      tb_error("====== RESET / BREAK ON RESET: RESET error- test 1 =====");
       if (puc_rst      !== 1'b1)          tb_error("====== RESET / BREAK ON RESET: RESET error- test 2 =====");
       dbg_uart_wr(CPU_CTL,  16'h0000); // RELEASE RESET
+      repeat(80) @(posedge mclk);
       dbg_uart_rd(CPU_STAT);           // READ STATUS
       if (dbg_uart_buf !== 16'h0004)      tb_error("====== RESET / BREAK ON RESET: RESET error- test 3 =====");
       if (puc_rst      !== 1'b0)          tb_error("====== RESET / BREAK ON RESET: RESET error- test 4 =====");
@@ -133,10 +136,11 @@ initial
       if (dbg_uart_buf !== 16'h0004)      tb_error("====== RESET / BREAK ON RESET: BREAK ON RESET error- test 1 =====");
       if (puc_rst      !== 1'b1)          tb_error("====== RESET / BREAK ON RESET: BREAK ON RESET error- test 2 =====");
       dbg_uart_wr(CPU_CTL,  16'h0020); // RELEASE RESET
+      repeat(80) @(posedge mclk);
       dbg_uart_rd(CPU_STAT);           // READ STATUS
       if (dbg_uart_buf !== 16'h0005)      tb_error("====== RESET / BREAK ON RESET: BREAK ON RESET error- test 3 =====");
       if (puc_rst      !== 1'b0)          tb_error("====== RESET / BREAK ON RESET: BREAK ON RESET error- test 4 =====");
-      repeat(10) @(posedge mclk);
+      repeat(12) @(posedge mclk);
       test_var = inst_number;
       repeat(50) @(posedge mclk);
       if (test_var !== inst_number)       tb_error("====== RESET / BREAK ON RESET: BREAK ON RESET error- test 5 =====");
@@ -156,6 +160,7 @@ initial
 
       dbg_uart_wr(CPU_CTL,  16'h0048);  // RESET & ENABLE SOFTWARE BREAKPOINT
       dbg_uart_wr(CPU_CTL,  16'h0008);  // RELEASE RESET
+      repeat(80) @(posedge mclk);
       dbg_uart_rd(CPU_STAT);            // READ STATUS
       if (dbg_uart_buf !== 16'h000D)      tb_error("====== SOFTWARE BREAKPOINT: test 1 =====");
       if (r0           !== ('h10000-`PMEM_SIZE+'h12))      tb_error("====== SOFTWARE BREAKPOINT: test 2 =====");

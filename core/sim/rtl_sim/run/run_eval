@@ -1,0 +1,54 @@
+#!/bin/bash
+
+# Enable/Disable waveform dumping
+OMSP_NODUMP=0
+export OMSP_NODUMP
+
+# Choose GCC toolchain prefix ('msp430' for MSPGCC / 'msp430-elf' for GCC RedHat/TI)
+# Note: default to MSPGCC until GCC RedHat/TI is mature enough
+if command -v msp430-gcc >/dev/null; then
+    MSPGCC_PFX=msp430
+else
+    MSPGCC_PFX=msp430-elf
+fi
+#MSPGCC_PFX=msp430-elf
+export MSPGCC_PFX
+
+# Choose simulator:
+#                   - iverilog  : Icarus Verilog  (default)
+#                   - cver      : CVer
+#                   - verilog   : Verilog-XL
+#                   - ncverilog : NC-Verilog
+#                   - vcs       : VCS
+#                   - vsim      : Modelsim
+#                   - isim      : Xilinx simulator
+OMSP_SIMULATOR=iverilog
+export OMSP_SIMULATOR
+
+rm -rf cov_work
+
+
+LOG_DIR=./log
+rm -rf $LOG_DIR/*
+mkdir -p $LOG_DIR
+
+export __IPE_SIM=1
+__IPE_IRQ_FW=1 __IPE_MULT_LINK=1 ../bin/msp430sim -firmware ../src/ipe/bootcode-fw-irq_mult.s43 ipe/eval/fw_irq_time_eval | tee $LOG_DIR/fw_irq_time_eval.log
+
+../bin/msp430sim -firmware ../src/ipe/old_bootcode.s43 ipe/eval/fw_orig_time_eval | tee $LOG_DIR/fw_orig_time_eval.log
+../bin/msp430sim -firmware ../src/ipe/bootcode-fw-irq.s43 ipe/eval/fw_orig_time_eval | tee $LOG_DIR/fw_orig_irq_time_eval.log
+../bin/msp430sim  ipe/eval/fw_ext_time_eval | tee $LOG_DIR/fw_ext_time_eval.log
+../bin/msp430sim  -firmware ../src/ipe/bootcode_ord.s43 ipe/eval/fw_ext_sort_time_eval | tee $LOG_DIR/fw_ext_sort_time_eval.log
+
+
+
+# Report regression results
+../bin/parse_results $LOG_DIR
+
+FIRST_RES=$?
+
+rm -rf cov_work
+
+if [ $? -ne 3 ] || [ $FIRST_RES -ne 0 ]; then
+    exit 1
+fi

@@ -52,7 +52,7 @@ initial
   `else
       test_nr = 0;
       #1 dbg_en = 0;
-      repeat(30) @(posedge mclk);
+      repeat(130) @(posedge mclk);
       stimulus_done = 0;
 
       // Make sure the CPU always starts executing when the
@@ -201,6 +201,7 @@ initial
       irq[`IRQ_NR-15] = 1'b0;
 
       stimulus_done = 1;
+      stimulus_kill = 1;
 
   `endif
 `else

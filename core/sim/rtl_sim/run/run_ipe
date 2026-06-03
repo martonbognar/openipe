@@ -34,6 +34,7 @@ mkdir -p $LOG_DIR
 
 export __IPE_SIM=1
 
+
 # IPE register behavior
 ../bin/msp430sim ipe/ipe_noflag | tee $LOG_DIR/ipe_noflag.log
 ../bin/msp430sim ipe/ipe_incorrect_pointer | tee $LOG_DIR/ipe_incorrect_pointer.log
@@ -42,11 +43,47 @@ export __IPE_SIM=1
 ../bin/msp430sim ipe/ipe_locked_registers | tee $LOG_DIR/ipe_locked_registers.log
 ../bin/msp430sim ipe/ipe_changing_registers | tee $LOG_DIR/ipe_changing_registers.log
 ../bin/msp430sim ipe/ipe_inside_access | tee $LOG_DIR/ipe_inside_access.log
+../bin/msp430sim ipe/ipe_reverse_border | tee $LOG_DIR/ipe_reverse_border.log
+
+../bin/msp430sim ipe/ipe2_noflag | tee $LOG_DIR/ipe2_noflag.log
+../bin/msp430sim ipe/ipe2_incorrect_pointer | tee $LOG_DIR/ipe2_incorrect_pointer.log
+../bin/msp430sim ipe/ipe2_correct_pointer | tee $LOG_DIR/ipe2_correct_pointer.log
+../bin/msp430sim ipe/ipe2_existing_pointer | tee $LOG_DIR/ipe2_existing_pointer.log
+../bin/msp430sim ipe/ipe2_locked_registers | tee $LOG_DIR/ipe2_locked_registers.log
+../bin/msp430sim ipe/ipe2_changing_registers | tee $LOG_DIR/ipe2_changing_registers.log
+../bin/msp430sim ipe/ipe2_inside_access | tee $LOG_DIR/ipe2_inside_access.log
+
+
+# IPE register behavior with multiple IPEs and overlapping regions
+../bin/msp430sim ipe/ipe2_mult_correct_pointers | tee $LOG_DIR/ipe2_mult_correct_pointers.log
+../bin/msp430sim ipe/ipe2_mult_incorrect_pointers | tee $LOG_DIR/ipe2_mult_incorrect_pointers.log
+../bin/msp430sim ipe/ipe2ipe_overlap | tee $LOG_DIR/ipe2ipe_overlap.log
+../bin/msp430sim ipe/ipe2ipe_overlap2 | tee $LOG_DIR/ipe2ipe_overlap2.log
+../bin/msp430sim ipe/ipe2ipe_overlap3 | tee $LOG_DIR/ipe2ipe_overlap3.log
+../bin/msp430sim ipe/ipe2ipe_overlap4 | tee $LOG_DIR/ipe2ipe_overlap4.log
+../bin/msp430sim ipe/ipe2ipe_overlap -firmware ../src/ipe/bootcode_ord.s43 | tee $LOG_DIR/ipe2ipe_overlap_ord.log
+../bin/msp430sim ipe/ipe2ipe_overlap2 -firmware ../src/ipe/bootcode_ord.s43 | tee $LOG_DIR/ipe2ipe_overlap2_ord.log
+../bin/msp430sim ipe/ipe2ipe_overlap3 -firmware ../src/ipe/bootcode_ord.s43 | tee $LOG_DIR/ipe2ipe_overlap3_ord.log
+../bin/msp430sim ipe/ipe2ipe_overlap4 -firmware ../src/ipe/bootcode_ord.s43 | tee $LOG_DIR/ipe2ipe_overlap4_ord.log
+
+# Bootcode tests
+../bin/msp430sim ipe/bootcode_ordening -firmware ../src/ipe/bootcode_ord.s43 | tee $LOG_DIR/bootcode_ordening.log
+
 
 # Protecting IPE region against software
 ../bin/msp430sim ipe/ipe_sw_read | tee $LOG_DIR/ipe_sw_read.log
 ../bin/msp430sim ipe/ipe_sw_write | tee $LOG_DIR/ipe_sw_write.log
 ../bin/msp430sim ipe/ipe_sw_jump | tee $LOG_DIR/ipe_sw_jump.log
+
+../bin/msp430sim ipe/ipe2_sw_read | tee $LOG_DIR/ipe2_sw_read.log
+../bin/msp430sim ipe/ipe2_sw_write | tee $LOG_DIR/ipe2_sw_write.log
+../bin/msp430sim ipe/ipe2_sw_jump | tee $LOG_DIR/ipe2_sw_jump.log
+
+# Protecting mutually distrusting IPE regions from eachother
+../bin/msp430sim ipe/ipe2ipe_access | tee $LOG_DIR/ipe2ipe_access.log
+../bin/msp430sim ipe/ipe2ipe_jump | tee $LOG_DIR/ipe2ipe_jump.log
+__IPE_MULT_LINK=1 __IPE_PC=1 __IPE_GRAN=1 ../bin/msp430sim ipe/ipe_periph_child | tee $LOG_DIR/ipe_periph_child.log
+__IPE_MULT_LINK=1 __IPE_PC=1 ../bin/msp430sim ipe/ipe2ipe_communication | tee $LOG_DIR/ipe2ipe_communication.log
 
 # Protecting the firmware against software
 ../bin/msp430sim ipe/firmware_sw_write | tee $LOG_DIR/firmware_sw_write.log
@@ -57,16 +94,33 @@ export __IPE_SIM=1
 ../bin/msp430sim ipe/ipe_dbg_write | tee $LOG_DIR/ipe_dbg_write.log
 ../bin/msp430sim ipe/ipe_dbg_halt | tee $LOG_DIR/ipe_dbg_halt.log
 
+../bin/msp430sim ipe/ipe2_dbg_read | tee $LOG_DIR/ipe2_dbg_read.log
+../bin/msp430sim ipe/ipe2_dbg_write | tee $LOG_DIR/ipe2_dbg_write.log
+../bin/msp430sim ipe/ipe2_dbg_halt | tee $LOG_DIR/ipe2_dbg_halt.log
+
 # Protecting the firmware against the debugger
 ../bin/msp430sim ipe/firmware_dbg_write | tee $LOG_DIR/firmware_dbg_write.log
 __IPE_IRQ_FW=1 ../bin/msp430sim ipe/firmware_dbg_halt -firmware ../src/ipe/bootcode-fw-irq.s43 | tee $LOG_DIR/firmware_dbg_halt.log
+
+__IPE_IRQ_FW=1 __IPE_MULT_LINK=1 ../bin/msp430sim ipe/firmware_dbg_halt -firmware ../src/ipe/bootcode-fw-irq_mult.s43 | tee $LOG_DIR/firmware_dbg_halt_mult.log
+
 
 # Preventing attacks
 ../bin/msp430sim ipe/attack_ccc | tee $LOG_DIR/attack_ccc.log
 ../bin/msp430sim ipe/attack_irq_exploit | tee $LOG_DIR/attack_irq_exploit.log
 ../bin/msp430sim ipe/attack_malicious_reti | tee $LOG_DIR/attack_malicious_reti.log
 ../bin/msp430sim ipe/attack_nmi_handler | tee $LOG_DIR/attack_nmi_handler.log
+../bin/msp430sim ipe/attack_child_takeover1 | tee $LOG_DIR/attack_child_takeover1.log
+../bin/msp430sim ipe/attack_child_takeover2 | tee $LOG_DIR/attack_child_takeover2.log
 __IPE_IRQ_FW=1 ../bin/msp430sim ipe/attack_firmware_rop -firmware ../src/ipe/bootcode-fw-irq.s43 | tee $LOG_DIR/attack_firmware_rop.log
+
+__IPE_IRQ_FW=1 __IPE_MULT_LINK=1 ../bin/msp430sim ipe/attack_firmware_rop -firmware ../src/ipe/bootcode-fw-irq_mult.s43 | tee $LOG_DIR/attack_firmware_rop_mult.log
+
+
+../bin/msp430sim ipe/attack2_ccc | tee $LOG_DIR/attack2_ccc.log
+../bin/msp430sim ipe/attack2_irq_exploit | tee $LOG_DIR/attack2_irq_exploit.log
+../bin/msp430sim ipe/attack2_malicious_reti | tee $LOG_DIR/attack2_malicious_reti.log
+../bin/msp430sim ipe/attack2_nmi_handler | tee $LOG_DIR/attack2_nmi_handler.log
 
 # Disable random DMA accesses for DMA tests
 unset __IPE_SIM
@@ -75,17 +129,29 @@ unset __IPE_SIM
 ../bin/msp430sim ipe/ipe_dma_read | tee $LOG_DIR/ipe_dma_read.log
 ../bin/msp430sim ipe/ipe_dma_write | tee $LOG_DIR/ipe_dma_write.log
 
+../bin/msp430sim ipe/ipe2_dma_read | tee $LOG_DIR/ipe2_dma_read.log
+../bin/msp430sim ipe/ipe2_dma_write | tee $LOG_DIR/ipe2_dma_write.log
+
 # Protecting the firmware against DMA writes
 ../bin/msp430sim ipe/firmware_dma_write | tee $LOG_DIR/firmware_dma_write.log
 
 export __IPE_SIM=1
 
 # Use case: SW-based secure interrupts
-__IPE_IRQ_SW=1 ../bin/msp430sim ipe/case-study/sw_irq | tee $LOG_DIR/sw_irq.log
+__IPE_IRQ_SW=1 __IPE_MULT_LINK=1 ../bin/msp430sim ipe/case-study/sw_irq | tee $LOG_DIR/sw_irq.log
+__IPE_IRQ_SW=1 __IPE_MULT_LINK=1 ../bin/msp430sim ipe/case-study/sw2_irq | tee $LOG_DIR/sw2_irq.log
+
 
 # Use case: FW-based secure interrupts with Nemesis mitigation
-__IPE_IRQ_FW=1 ../bin/msp430sim -firmware ../src/ipe/bootcode-fw-irq.s43 ipe/case-study/fw_irq | tee $LOG_DIR/fw_irq.log
-__IPE_IRQ_FW=1 ../bin/msp430sim -firmware ../src/ipe/bootcode-fw-irq.s43 ipe/case-study/fw_irq_nemesis | tee $LOG_DIR/fw_irq_nemesis.log
+__IPE_IRQ_FW=1 __IPE_MULT_LINK=1 ../bin/msp430sim -firmware ../src/ipe/bootcode-fw-irq.s43 ipe/case-study/fw_irq | tee $LOG_DIR/fw_irq.log
+__IPE_IRQ_FW=1 __IPE_MULT_LINK=1 ../bin/msp430sim -firmware ../src/ipe/bootcode-fw-irq.s43 ipe/case-study/fw_irq_nemesis | tee $LOG_DIR/fw_irq_nemesis.log
+
+__IPE_IRQ_FW=1 __IPE_MULT_LINK=1 ../bin/msp430sim -firmware ../src/ipe/bootcode-fw-irq_mult.s43 ipe/case-study/fw2_irq | tee $LOG_DIR/fw2_irq.log
+__IPE_IRQ_FW=1 __IPE_MULT_LINK=1 ../bin/msp430sim -firmware ../src/ipe/bootcode-fw-irq_mult.s43 ipe/case-study/fw_irq_mult | tee $LOG_DIR/fw_irq_mult.log
+__IPE_IRQ_FW=1 __IPE_MULT_LINK=1 ../bin/msp430sim -firmware ../src/ipe/bootcode-fw-irq_mult.s43 ipe/isr_register | tee $LOG_DIR/isr_register.log
+__IPE_IRQ_FW=1 __IPE_MULT_LINK=1 ../bin/msp430sim -firmware ../src/ipe/bootcode-fw-irq_mult.s43 ipe/isr_verify | tee $LOG_DIR/isr_verify.log
+
+
 
 # Report regression results
 ../bin/parse_results $LOG_DIR
@@ -105,6 +171,10 @@ export __OMIT_SP_SWITCHING=1
 ../bin/msp430sim ipe/ipe_sw_jump | tee $LOG_DIR/ipe_sw_jump.log
 ../bin/msp430sim ipe/attack_ccc | tee $LOG_DIR/attack_ccc.log
 ../bin/msp430sim ipe/attack_irq_exploit | tee $LOG_DIR/attack_irq_exploit.log
+
+../bin/msp430sim ipe/ipe2_sw_jump | tee $LOG_DIR/ipe2_sw_jump.log
+../bin/msp430sim ipe/attack2_ccc | tee $LOG_DIR/attack2_ccc.log
+../bin/msp430sim ipe/attack2_irq_exploit | tee $LOG_DIR/attack2_irq_exploit.log
 
 # Report regression results
 ../bin/parse_results $LOG_DIR

@@ -8,7 +8,7 @@ initial
 `ifdef DBG_UART
       #1 dbg_en = 1;
 
-      repeat(10) @(posedge mclk);
+      repeat(50) @(posedge mclk);
       stimulus_done = 0;
 
       // SEND UART SYNCHRONIZATION FRAME
@@ -21,7 +21,7 @@ initial
       /* checkpoint 1 */
       @(r12 == 16'hCAFE);
 
-      if (bmem_0.mem[0] !== 16'h9382)
+      if (bmem_0.mem[0] !== 16'h403a)
          tb_error("====== unexpected bootcode start value ======");
       dbg_uart_wr(MEM_ADDR, `BMEM_BASE);  // select register
       dbg_uart_wr(MEM_DATA, 16'd43);  // write data
@@ -30,7 +30,7 @@ initial
       /* ----------------------  END OF TEST --------------- */
       @(r0==16'hFFFF);
 
-      if (bmem_0.mem[0] !== 16'h9382)
+      if (bmem_0.mem[0] !== 16'h403a)
          tb_error("====== bootcode overwritten ======");
 
       stimulus_done = 1;

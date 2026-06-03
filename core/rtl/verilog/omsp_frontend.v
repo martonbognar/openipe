@@ -165,9 +165,9 @@ input                wdt_irq;          // Watchdog-timer interrupt
 input                wdt_wkup;         // Watchdog Wakeup
 input                wkup;             // System Wake-up (asynchronous)
 `ifdef HW_DISABLE_IPE_IRQ
-input                ipe_executing;
+input          [3:0] ipe_executing;
 `elsif SECURE_IRQ_SW
-input                ipe_executing;
+input          [3:0] ipe_executing;
 input         [15:0] ipe_seg_end;
 `endif
 input                pmem_writing;
@@ -334,7 +334,7 @@ always @(posedge mclk or posedge puc_rst)
 
 wire irq_detect_helper = (nmi_pnd | ((|irq | wdt_irq) & gie)) & ~cpu_halt_req & ~cpu_halt_st & (exec_done | (i_state==I_IDLE));
 `ifdef HW_DISABLE_IPE_IRQ
-assign  irq_detect = irq_detect_helper & ~ipe_executing;
+assign  irq_detect = irq_detect_helper & ~|ipe_executing;
 `else
 assign  irq_detect = irq_detect_helper;
 `endif
@@ -378,7 +378,7 @@ always @(posedge mclk_irq_num or posedge puc_rst)
 `ifdef SECURE_IRQ_SW
     // if interrupting IPE, use IVT included at the end of IPE region, otherwise use regular IVT
     wire [6:0] irq_idx       = irq_num - 48;
-    wire [15:0] irq_addr     = ipe_executing ?
+    wire [15:0] irq_addr     = |ipe_executing ?
                                  {(ipe_seg_end - 16'd32) + {irq_idx, 1'b0}} :
                                  {9'h1ff, irq_num, 1'b0};
 `else

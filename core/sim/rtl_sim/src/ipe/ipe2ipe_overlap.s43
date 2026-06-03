@@ -1,0 +1,60 @@
+; Not possible to place an IPE region that completely engulves another IPE region
+.include "pmem_defs.asm"
+
+    .global main
+    .sect .text
+main:
+    mov #0xBEEF, r15 ;; checkpoint 1
+    br #end_of_test
+    
+
+        /* ----------------------         END OF TEST        --------------- */
+end_of_test:
+    nop
+    br #0xffff
+
+    .sect .ipe_seg, "a"
+ipe_struct2:
+    .word 0x00E0, 0x0880, 0x0800, 0xFF9F
+ipe_code2:
+    mov #42, r12
+    mov #42, r13
+    mov #42, r14
+
+    .org ipe_struct2 + 0x400
+ipe_struct:
+    .word 0x00E0, 0x0860, 0x0840, 0xFF3F
+ipe_code:
+    mov #42, r12
+    mov #42, r13
+    mov #42, r14
+
+
+
+        /* ----------------------        IPE METADATA        --------------- */
+
+.section .ipe_meta, "a"
+    .word 0xAAAA
+    .word ipe_struct
+    .word 0xAAAA
+    .word ipe_struct2
+
+        /* ----------------------         INTERRUPT VECTORS  --------------- */
+
+.section .vectors, "a"
+.word end_of_test    ; Interrupt  0 (lowest priority)    <unused>
+.word end_of_test    ; Interrupt  1                      <unused>
+.word end_of_test    ; Interrupt  2                      <unused>
+.word end_of_test    ; Interrupt  3                      <unused>
+.word end_of_test    ; Interrupt  4                      <unused>
+.word end_of_test    ; Interrupt  5                      <unused>
+.word end_of_test    ; Interrupt  6                      <unused>
+.word end_of_test    ; Interrupt  7                      <unused>
+.word end_of_test        ; Interrupt  8                      <unused>
+.word end_of_test    ; Interrupt  9                      <unused>
+.word end_of_test    ; Interrupt 10                      Watchdog timer
+.word end_of_test    ; Interrupt 11                      <unused>
+.word end_of_test    ; Interrupt 12                      <unused>
+.word end_of_test    ; Interrupt 13                      <unused>
+.word end_of_test    ; Interrupt 14                      NMI
+.word main           ; Interrupt 15 (highest priority)   RESET

@@ -94,6 +94,24 @@ if [ "${OMSP_SIMULATOR:-iverilog}" = iverilog ]; then
     if [ -n "${__IPE_IRQ_FW}" ]; then
       EXTRA_IPE_FLAG+='-DSECURE_IRQ_FW '
     fi
+    if [ -n "${__IPE_1REGIONS}" ]; then
+      EXTRA_IPE_FLAG+='-DIPE_1REGIONS '
+    fi
+    if [ -n "${__IPE_2REGIONS}" ]; then
+      EXTRA_IPE_FLAG+='-DIPE_2REGIONS '
+    fi
+    if [ -n "${__IPE_3REGIONS}" ]; then
+      EXTRA_IPE_FLAG+='-DIPE_3REGIONS '
+    fi
+    if [ -n "${__IPE_4REGIONS}" ]; then
+      EXTRA_IPE_FLAG+='-DIPE_4REGIONS '
+    fi
+    if [ -n "${__IPE_GRAN}" ]; then
+      EXTRA_IPE_FLAG+='-DIPE_GRAN '
+    fi
+    if [ -n "${__IPE_PC}" ]; then
+      EXTRA_IPE_FLAG+='-DIPE_PC '
+    fi
     if [ $NODUMP -eq 1 ]
       then
         iverilog -o simv -c $3 -D SEED=$4 -D $5 -D NODUMP ${IPE_SIM_FLAG} ${EXTRA_IPE_FLAG}

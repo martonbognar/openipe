@@ -86,7 +86,15 @@ BMEM_BASE=$((PER_SIZE+DMEM_SIZE))
 BMEM_IVT_BASE=$((BMEM_BASE+BMEM_TOTAL_SIZE-0x24))
 BMEM_TRAMPOLINE_BASE=$((BMEM_BASE+BMEM_TOTAL_SIZE-0x4))
 
-cp  $3  ./pmem.x
+# Select linker script based on flag
+if [ "$__IPE_MULT_LINK" = "1" ]; then
+    echo "[INFO] Using linker script for multiple IPE segments"
+    LINKER_FILE="../bin/ipe_linker_mult.x"
+else
+    LINKER_FILE="$3"
+fi
+
+cp  $LINKER_FILE  ./pmem.x
 cp  $4  ./pmem_defs.asm
 sed -ie "s/PMEM_BASE/$PMEM_BASE/g"         pmem.x
 sed -ie "s/PMEM_SIZE/$PMEM_SIZE/g"         pmem.x

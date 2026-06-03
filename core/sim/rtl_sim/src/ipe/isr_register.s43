@@ -1,0 +1,316 @@
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Test that when multiple ipe regions want to setup a handler for the same
+;; source, the numerically first region takes precedent to set it up. If a
+;; different region wants to setup a handler for a different interrupt source
+;; they can do so.
+;; In this test: IPE region 1 has isr for wdt_irq and IPE region 2 has isr for
+;; both wdt_irw and ta1_irq
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+.include "pmem_defs.asm"
+
+.set __IPE_CUSTOM_IVT, 1
+.include "../src-c/framework/libipe/stubs/ipe-protected-fw-irq.s"
+
+    .global main
+    .sect .data
+stack:
+    .word 0, 0, 0, 0
+    .space 100
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Main test harness, unprotected code
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+    .section .ipe_meta, "a"
+    .word 0xAAAB
+    .word ipestruct
+    .word 0xAAAB
+    .word ipestruct2
+    .word 0xAAAB
+    .word ipestruct3
+    .word 0xAAAB
+    .word ipestruct4
+    .word isr_list
+    .word isr_list2
+    .word isr_list3
+    .word isr_list4
+
+
+    .sect .text
+main:
+    nop
+    mov #0xCAFE, r12
+    nop
+
+
+end_of_test:
+    nop
+    br #0xffff
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; IPE configuration struct (left empty)
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+    .sect .ipestruct, "a"
+ipestruct:
+    .word 0x60, 0x896, 0x800, 0xFF09
+
+    .sect .ipe2struct, "a"
+ipestruct2:
+    .word 0x60, 0xa26, 0x990, 0xFC29
+
+    .sect .ipe3struct, "a"
+ipestruct3:
+    .word 0x60, 0xbb6, 0xb20, 0xFF09
+
+    .sect .ipe4struct, "a"
+ipestruct4:
+    .word 0x60, 0xd46, 0xcb0, 0xFE69
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; IPE single entry point dispatch table (usually generated)
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+    .global ecall_table
+    .global max_ecall_index
+    .global ecall_table2
+    .global max_ecall_index2
+    .global ecall_table3
+    .global max_ecall_index3
+    .global ecall_table4
+    .global max_ecall_index4
+    .global own_isrs
+    .sect ".ipe_const", "a"
+    .align 2
+ecall_table:
+    .word 0
+    .word 0
+
+max_ecall_index:
+    .word 0
+
+isr_list:
+    .word 0x492
+
+    .sect ".ipe2_const", "a"
+    .align 2
+ecall_table2:
+    .word 0
+    .word 0
+
+max_ecall_index2:
+    .word 0
+
+isr_list2:
+    .word 0x2409
+
+    .sect ".ipe3_const", "a"
+    .align 2
+ecall_table3:
+    .word 0
+    .word 0
+
+max_ecall_index3:
+    .word 0
+
+isr_list3:
+    .word 0x1248
+
+    .sect ".ipe4_const", "a"
+    .align 2
+ecall_table4:
+    .word 0
+    .word 0
+
+max_ecall_index4:
+    .word 0
+
+isr_list4:
+    .word 0x9024
+
+    .sect .ipe:_isr
+trusted_isr_handler1:
+    nop
+    reti
+
+trusted_isr_handler2:
+    nop
+    reti
+
+trusted_isr_handler3:
+    nop
+    reti
+
+trusted_isr_handler4:
+    nop
+    reti
+
+    .sect .ipe2:_isr
+trusted_isr2_handler1:
+    nop
+    reti
+
+trusted_isr2_handler2:
+    nop
+    reti
+
+trusted_isr2_handler3:
+    nop
+    reti
+
+trusted_isr2_handler4:
+    nop
+    reti
+
+    .sect .ipe3:_isr
+trusted_isr3_handler1:
+    nop
+    reti
+
+trusted_isr3_handler2:
+    nop
+    reti
+
+trusted_isr3_handler3:
+    nop
+    reti
+
+trusted_isr3_handler4:
+    nop
+    reti
+
+    .sect .ipe4:_isr
+trusted_isr4_handler1:
+    nop
+    reti
+
+trusted_isr4_handler2:
+    nop
+    reti
+
+trusted_isr4_handler3:
+    nop
+    reti
+
+trusted_isr4_handler4:
+    nop
+    reti
+
+    .section .text
+    .global untrusted_isr
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Trampoline code to IPE in untrusted code
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+    ; trusted ISR will return to untrusted trampoline to execute `reti`, which
+    ; will return here because of the "fake" stack entries
+untrusted_cont:
+    pop_all_regs
+
+    ; return to originally interrupted instruction
+    reti
+
+trusted_cont:
+    ; set up fake stack for untrusted ISR
+    get_ipe_entry r15
+    push r15
+    push r2
+
+    br &IRQ_NUM
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; IPE interrupt vector table
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+    .section .ipe_vectors, "a"
+.word undef_irq  ; Interrupt  0 (lowest priority)    <unused>
+.word trusted_isr_handler1  ; Interrupt  1                      <unused>
+.word undef_irq  ; Interrupt  2                      <unused>
+.word undef_irq  ; Interrupt  3                      <unused>
+.word trusted_isr_handler2  ; Interrupt  4                      <unused>
+.word undef_irq  ; Interrupt  5                      <unused>
+.word undef_irq  ; Interrupt  6                      <unused>
+.word trusted_isr_handler3  ; Interrupt  7                      <unused>
+.word undef_irq  ; Interrupt  8                      <unused>
+.word undef_irq  ; Interrupt  9                      <unused>
+.word trusted_isr_handler4  ; Interrupt 10                      Watchdog timer
+.word undef_irq ; Interrupt 11                      <unused>
+.word undef_irq ; Interrupt 12                      <unused>
+.word undef_irq ; Interrupt 13                      <unused>
+.word undef_irq ; Interrupt 14                      NMI
+.word undef_irq ; Interrupt 15 (highest priority)   RESET
+
+    .section .ipe2_vectors, "a"
+.word trusted_isr2_handler3  ; Interrupt  0 (lowest priority)    <unused>
+.word undef_irq  ; Interrupt  1                      <unused>
+.word undef_irq  ; Interrupt  2                      <unused>
+.word trusted_isr2_handler4  ; Interrupt  3                      <unused>
+.word undef_irq  ; Interrupt  4                      <unused>
+.word undef_irq  ; Interrupt  5                      <unused>
+.word undef_irq  ; Interrupt  6                      <unused>
+.word undef_irq  ; Interrupt  7                      <unused>
+.word undef_irq  ; Interrupt  8                      <unused>
+.word undef_irq  ; Interrupt  9                      <unused>
+.word trusted_isr2_handler1   ; Interrupt 10                      Watchdog timer
+.word undef_irq ; Interrupt 11                      <unused>
+.word undef_irq ; Interrupt 12                      <unused>
+.word trusted_isr2_handler2 ; Interrupt 13                      <unused>
+.word undef_irq ; Interrupt 14                      NMI
+.word undef_irq ; Interrupt 15 (highest priority)   RESET
+
+    .section .ipe3_vectors, "a"
+.word undef_irq  ; Interrupt  0 (lowest priority)    <unused>
+.word undef_irq  ; Interrupt  1                      <unused>
+.word undef_irq  ; Interrupt  2                      <unused>
+.word trusted_isr3_handler1  ; Interrupt  3                      <unused>
+.word undef_irq  ; Interrupt  4                      <unused>
+.word undef_irq  ; Interrupt  5                      <unused>
+.word trusted_isr3_handler2  ; Interrupt  6                      <unused>
+.word undef_irq  ; Interrupt  7                      <unused>
+.word undef_irq  ; Interrupt  8                      <unused>
+.word trusted_isr3_handler3  ; Interrupt  9                      <unused>
+.word undef_irq   ; Interrupt 10                      Watchdog timer
+.word undef_irq ; Interrupt 11                      <unused>
+.word trusted_isr3_handler4 ; Interrupt 12                      <unused>
+.word undef_irq ; Interrupt 13                      <unused>
+.word undef_irq ; Interrupt 14                      NMI
+.word undef_irq ; Interrupt 15 (highest priority)   RESET
+
+    .section .ipe4_vectors, "a"
+.word undef_irq  ; Interrupt  0 (lowest priority)    <unused>
+.word undef_irq  ; Interrupt  1                      <unused>
+.word trusted_isr4_handler3  ; Interrupt  2                      <unused>
+.word undef_irq  ; Interrupt  3                      <unused>
+.word undef_irq  ; Interrupt  4                      <unused>
+.word trusted_isr4_handler4  ; Interrupt  5                      <unused>
+.word undef_irq  ; Interrupt  6                      <unused>
+.word undef_irq  ; Interrupt  7                      <unused>
+.word undef_irq  ; Interrupt  8                      <unused>
+.word undef_irq  ; Interrupt  9                      <unused>
+.word undef_irq   ; Interrupt 10                      Watchdog timer
+.word undef_irq ; Interrupt 11                      <unused>
+.word trusted_isr4_handler1 ; Interrupt 12                      <unused>
+.word undef_irq ; Interrupt 13                      <unused>
+.word undef_irq ; Interrupt 14                      NMI
+.word trusted_isr4_handler2 ; Interrupt 15 (highest priority)   RESET
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Unprotected interrupt vector table
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+.section .vectors, "a"
+.word end_of_test    ; Interrupt  0 (lowest priority)    <unused>
+.word end_of_test    ; Interrupt  1                      <unused>
+.word end_of_test    ; Interrupt  2                      <unused>
+.word end_of_test    ; Interrupt  3                      <unused>
+.word end_of_test    ; Interrupt  4                      <unused>
+.word end_of_test    ; Interrupt  5                      <unused>
+.word end_of_test    ; Interrupt  6                      <unused>
+.word end_of_test    ; Interrupt  7                      <unused>
+.word untrusted_cont    ; Interrupt  8                      <unused>
+.word end_of_test    ; Interrupt  9                      <unused>
+.word untrusted_cont    ; Interrupt 10                      Watchdog timer
+.word end_of_test    ; Interrupt 11                      <unused>
+.word end_of_test    ; Interrupt 12                      <unused>
+.word end_of_test    ; Interrupt 13                      <unused>
+.word end_of_test    ; Interrupt 14                      NMI
+.word main           ; Interrupt 15 (highest priority)   RESET

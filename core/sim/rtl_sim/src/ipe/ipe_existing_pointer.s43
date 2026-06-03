@@ -10,7 +10,7 @@ custom_struct:
     .word 0x0040, 0x0480, 0x0440, 0xFF7F
 
 attacker_struct:
-    .word 0, 0, 0, 0xFFFF
+    .word 0, 0x1, 0, 0xFFFE
 
 main:
     nop

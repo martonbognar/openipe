@@ -275,7 +275,7 @@ wire                 ipe_fe_violation;
 `endif
 wire                 ipe_dma_violation;
 wire                 ipe_dbg_mem_violation;
-wire                 ipe_executing;
+wire           [3:0] ipe_executing;
 wire                 irq_detect;
 wire                 ipe_bootcode_exec;
 wire                 pmem_writing;
@@ -504,7 +504,7 @@ omsp_mem_backbone mem_backbone_0 (
 
 // INPUTs
     .cpu_halt_st       (cpu_halt_st),        // Halt/Run status from CPU
-    .dbg_halt_cmd      (dbg_halt_cmd & ~ipe_executing & ~ipe_bootcode_exec),       // Debug interface Halt CPU command
+    .dbg_halt_cmd      (dbg_halt_cmd & ~|ipe_executing & ~ipe_bootcode_exec),       // Debug interface Halt CPU command
     .dbg_mem_addr      (dbg_mem_addr[15:1]), // Debug address for rd/wr access
     .dbg_mem_dout      (dbg_mem_dout),       // Debug unit data output
     .dbg_mem_en        (dbg_mem_en),         // Debug unit memory enable
@@ -573,6 +573,7 @@ ipe_periph ipe (
 // control INPUTs
     .fe_decode           (fe_decode | |irq_acc),             // Buffered PC of the current instruction
     .eu_mab            (eu_mab),              // Execution unit memory address bus
+    .eu_mb_wr          (eu_mb_wr),
     .fe_pc             (pc),                  // Frontend current fetch address
     .fe_pc_nxt         (pc_nxt),              // Frontend next fetch address
     .nmi_acc           (nmi_acc),             // NMI accepted

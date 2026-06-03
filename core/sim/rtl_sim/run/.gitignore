@@ -12,3 +12,6 @@ pmem_defs.asme
 *.l43
 *.ihex
 log
+waveform_settings
+sed5mvALM
+sed*
