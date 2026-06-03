@@ -23,6 +23,7 @@ RUN python3 -m pip install -r requirements.txt && rm requirements.txt
 
 WORKDIR /pandora
 RUN git clone https://github.com/pandora-tee/pandora .
+RUN git fetch
 RUN git checkout 921d514
 RUN git clone https://github.com/angr/angr-platforms
 RUN cd angr-platforms && git checkout d9231f2 && cd ..
