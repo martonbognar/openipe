@@ -1,21 +1,21 @@
 #!/usr/bin/python3
 import sys
-import os
+from pathlib import Path
 import re
-import subprocess
 import json
+from itertools import chain
 
 from elftools.elf.elffile import ELFFile
 from elftools.elf.sections import SymbolTableSection
 
-
 from jinja2 import Template
 from common import *
 
+def get_libipe_path(subpath):
+    return Path(sys.argv[0]).resolve().parent / 'libipe' / subpath
 
-CFLAGS = '-Wall -std=gnu99 -g -mcpu=430 -mmpy=none -D__MSP430F149__'
-
-
+# The `--add-symbol` option is only available for GNU binutils > msp430-gcc.
+# This function therefore relies on msp430-elf-objcopy from the TI GCC port.
 def add_sym(file, sym_map):
     args = []
 
@@ -34,9 +34,9 @@ def is_section_in_file(fn, section_name):
     
 
 def create_empty_section(fn, section_name):
-    nf = get_tmp(suffix='.bin')
+    info(f"creating empty section '{section_name}'...")
+    nf = get_tmp(suffix='.bin', prefix='empty_')
     call_prog('msp430-elf-objcopy', ['--add-section', f'{section_name}={nf}', fn, fn])
-
 
 
 def get_elf_relocations(fn):
@@ -60,34 +60,25 @@ def get_elf_relocations(fn):
                 # https://gcc.gnu.org/onlinedocs/gccint/Integer-library-routines.html
                 if re.match(r'(memset|__(u|)(ashl|ashr|lshr|mul|div|mod)(q|h|s|d|t)i.*)', sym.name):
                     info(f'\tL__ intercepting relocation {sym.name}')
-                    rel_offset = section['sh_offset'] + n * section['sh_entsize']
-                    elf_relocations.append((rel_offset, sym.name))
+                    rel_offset = n * section['sh_entsize']
+                    elf_relocations.append((rel_offset, sym.name, section.name))
 
     return elf_relocations
 
-def get_arith_subs():
-    stubs_file = os.path.abspath(os.path.dirname(sys.argv[0]) + '/libipe/arithmetic_stubs/')
-    return [os.path.join(root, file) for root, _, files in os.walk(stubs_file) for file in files if file.endswith('.s')]
-
-
 def patch_relocs(fn):
     elf_relocations = get_elf_relocations(fn)
-    sym_map = {'__ipe_' + sym_name : '.ipe_func' for (_, sym_name) in elf_relocations}
+    sym_map = {'__ipe_' + sym_name : '.ipe_func' for (_, sym_name, _) in elf_relocations}
     
     if not is_section_in_file(fn, '.ipe_func'):
-        info("Section .ipe_func can't be found. Going to create an empty!")
         create_empty_section(fn, '.ipe_func')
 
     add_sym(fn, sym_map)
-
-    # add_sym modified offsets
-    elf_relocations = get_elf_relocations(fn)
-
+    
     info(f".. applying relocation patches to '{fn}'")
     with open(fn, 'r+b') as f:
         elf_file = ELFFile(f)
         symtab = elf_file.get_section_by_name('.symtab')
-        for (rel_offset, sym_name) in elf_relocations:
+        for (rela_offset, sym_name, rela_sect_name) in elf_relocations:
             ipe_sym_name = '__ipe_' + sym_name
 
             # get symbol table index of added symbol
@@ -95,18 +86,22 @@ def patch_relocs(fn):
                 if symtab.get_symbol(sym_idx).name == ipe_sym_name:
                     break
             if (symtab.get_symbol(sym_idx).name != ipe_sym_name):
-                info(f"\tL__ WARNING: '{ipe_sym_name:22}' not defined; skipping..")
+                warning(f"\tL__ '{ipe_sym_name:22}' not defined; skipping..")
                 continue
+
+            # re-calculate relocation offset (file has changed after add_sym)
+            rela_sect = elf_file.get_section_by_name(rela_sect_name)
+            offset = rela_sect['sh_offset'] + rela_offset
 
             # overwrite symbol table index in targeted relocation
             # skip r_offset and patch r_info 3 bytes (litte endian; lower byte
             # stores relocation type)
             # https://wiki.osdev.org/ELF_Tutorial#Relocation_Sections
-            info(f"\tL__ patching relocation  for symbol '{sym_name:22}'@{rel_offset} -> '{ipe_sym_name:27}'@{sym_idx}")
-            f.seek(rel_offset+5)
+            info(f"\tL__ patching relocation  for symbol '{sym_name:22}'@{offset} -> '{ipe_sym_name:27}'@{sym_idx}")
+            f.seek(offset+5)
             f.write(sym_idx.to_bytes(3, byteorder='little'))
 
-    return len(elf_relocations)
+    return list(sym_map.keys())
 
 
 def process_filename(filename):
@@ -154,21 +149,34 @@ def retrieve_stubs_entries(files):
                                 info(f"ecall found: {dic_stubs_entries['entries'][-1]}")
     return dic_stubs_entries
 
-
 def main():
     # Extract non-option arguments (filenames) and call our custom relocation patcher
     filenames = [arg for arg in sys.argv[1:] if arg.endswith('.o') and not arg.startswith('-')]
+    ipe_syms = {s.removeprefix("__ipe_").removeprefix("__").removeprefix("_") 
+                for s in chain.from_iterable(process_filename(f) for f in filenames)}
     
-    additional_files_to_link = []
-    files_to_compile = get_arith_subs() if sum([process_filename(filename) for filename in filenames]) > 0 else []
-    print(files_to_compile)
-
-    dic_stubs_entries = retrieve_stubs_entries(filenames)
-
+    # resolve arith stub dependencies
+    if 'divhi3' in ipe_syms:
+        ipe_syms.add('udivhi3')
+    elif 'modhi3' in ipe_syms:
+        ipe_syms.add('divhi3')
+        ipe_syms.add('udivhi3')
+    elif 'umodhi3' in ipe_syms:
+        ipe_syms.add('udivhi3')
+    
+    # add secure variants of compiler-inserted stubs (arithmetics, memset)
+    files_to_compile = []
+    for s in ipe_syms:
+        path = get_libipe_path(f'compiler_stubs/ipe_{s.removeprefix("__ipe_").removeprefix("__").removeprefix("_")}.s')
+        if not path.exists():
+            fatal_error(f'no stub for {s} (looked for {path})')
+        else:
+            files_to_compile.append(path)
 
     # write generated table file
-    files_to_compile.append(get_tmp(suffix='.s'))
-    with open(os.path.abspath(os.path.dirname(sys.argv[0]) + '/libipe/templates/generated_table.s')) as file:
+    dic_stubs_entries = retrieve_stubs_entries(filenames)
+    files_to_compile.append(Path(get_tmp(suffix='.s', prefix='generated_table_')))
+    with open(get_libipe_path('templates/generated_table.s')) as file:
         table_template = Template(file.read())
         table_obj = {
             'max_entry_index': len(dic_stubs_entries['entries']) - 1,
@@ -179,8 +187,8 @@ def main():
 
 
     # write generated stubs
-    files_to_compile.append(get_tmp(suffix='.s'))
-    with open(os.path.abspath(os.path.dirname(sys.argv[0]) + '/libipe/templates/generated_stubs.s')) as file:
+    files_to_compile.append(Path(get_tmp(suffix='.s', prefix='generated_stubs_')))
+    with open(get_libipe_path('templates/generated_stubs.s')) as file:
         stubs_template = Template(file.read())
         stubs_obj = {
             'stubs_to_unprotected': dic_stubs_entries['stubs'],
@@ -189,12 +197,11 @@ def main():
         with open(files_to_compile[-1], "w") as target_file:
             target_file.write(stubs_template.render(stubs_obj))
 
-    
+    additional_files_to_link = []
     for file in files_to_compile:
-        file_name = file.removesuffix('.s')
-        additional_files_to_link.append(f'{file_name}.o')
+        additional_files_to_link.append(f'{file.stem}.o')
 
-        call_prog("msp430-gcc", ['-c', file, '-o', additional_files_to_link[-1]])
+        call_prog("msp430-gcc", ['-c', str(file), '-o', additional_files_to_link[-1]])
 
 
     default_config = {
@@ -206,13 +213,12 @@ def main():
             for k in config:
                 default_config[k] = config[k]
     except FileNotFoundError:
-        info("Config found cannot be found!")
-
+        pass
     info(f'Config used: {default_config}')
 
-    additional_files_to_link.append(get_tmp(suffix='.o'))
-    entry_stub_file = os.path.abspath(os.path.join(os.path.dirname(sys.argv[0]) + '/libipe/stubs/', default_config['entry_stub']))
-    call_prog("msp430-gcc", ['-c', entry_stub_file, '-o', additional_files_to_link[-1]])
+    additional_files_to_link.append(get_tmp(suffix='.o', prefix='ipe_entry_'))
+    entry_stub_file = get_libipe_path('stubs/' + default_config['entry_stub'])
+    call_prog("msp430-gcc", ['-c', str(entry_stub_file), '-o', additional_files_to_link[-1]])
 
 
     linker_args = sys.argv[1:]

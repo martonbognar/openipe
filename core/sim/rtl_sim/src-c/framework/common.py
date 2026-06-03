@@ -24,8 +24,8 @@ def rm(*files):
 tmp_files = []
 
 
-def get_tmp(suffix=''):
-    tmp = tempfile.mkstemp(suffix)[1]
+def get_tmp(suffix='', prefix=''):
+    tmp = tempfile.mkstemp(suffix, prefix)[1]
     tmp_files.append(tmp)
     return tmp
 
