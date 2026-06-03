@@ -14,3 +14,4 @@ ecall_table:
 
 max_ecall_index:
     .word {{ max_entry_index }}
+

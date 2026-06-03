@@ -7,8 +7,12 @@ ARG DEBIAN_FRONTEND=noninteractive
 # Basic dependencies
 ################################################################################
 
-RUN apt-get update && apt-get install build-essential cmake iverilog tk binutils-msp430 gcc-msp430 msp430-libc msp430mcu expect-dev git python3 python3-pip python3-venv -y
+RUN apt-get update && apt-get install build-essential cmake iverilog tk binutils-msp430 gcc-msp430 msp430-libc msp430mcu expect-dev git python3 python3-pip python3-venv wget -y
 RUN python3 -m pip install pyelftools
+
+RUN wget https://dr-download.ti.com/software-development/ide-configuration-compiler-or-debugger/MD-LlCjWuAbzH/9.3.1.2/msp430-gcc-9.3.1.11_linux64.tar.bz2
+RUN tar xjf msp430-gcc-9.3.1.11_linux64.tar.bz2
+RUN cp msp430-gcc-9.3.1.11_linux64/bin/msp430-elf-objcopy /usr/bin/
 
 ################################################################################
 # Install dependencies for the software mitigation framework
@@ -26,8 +30,9 @@ RUN git clone https://github.com/pandora-tee/pandora .
 RUN git fetch
 RUN git checkout 921d514
 RUN git clone https://github.com/angr/angr-platforms
-RUN cd angr-platforms && git checkout d9231f2 && cd ..
-RUN python3 -m pip install -r requirements.txt && cd angr-platforms && python3 -m pip install .
+RUN python3 -m venv venv
+RUN ./venv/bin/pip install -r requirements.txt
+RUN cd angr-platforms && git checkout d9231f2 && ../venv/bin/pip install .
 
 ################################################################################
 # Copy convenience scripts

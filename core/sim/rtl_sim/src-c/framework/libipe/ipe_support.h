@@ -64,14 +64,4 @@ int constant_time_cmp(const unsigned char *x_, const unsigned char *y_, const un
 #undef always_inline
 #define always_inline static inline __attribute__((always_inline))
 
-/*
- * HACK: include this as a weak symbol here so it is included in the symbol table and we can
- * fixup any relocations, but discard this unused dummy wrapper at link time..
- */
-void __attribute__((weak)) IPE_FUNC *__ipe_memset(void *ptr, int value, int num); \
-void __attribute__((weak)) __attribute__((section(".discard"))) __wrapper_ipe_memset(void *ptr, int value, int num) \
-{ \
-    __ipe_memset(ptr, value, num); \
-}
-
 #endif /* IPE_SUPPORT_H_ */

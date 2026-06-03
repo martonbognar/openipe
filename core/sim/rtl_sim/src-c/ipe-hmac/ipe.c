@@ -1,6 +1,5 @@
 #include "mock.h"
 #include "../framework/libipe/ipe_support.h"
-#include "output/generated_ipe_header.h"
 
 DECLARE_IPE_STRUCT;
 
