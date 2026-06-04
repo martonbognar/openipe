@@ -1,4 +1,4 @@
-#!/usr/bin/python3
+#!/openipe_venv/bin/python3
 
 from common import *
 import copy
@@ -11,6 +11,9 @@ from pycparserext import ext_c_parser
 from pycparserext.ext_c_generator import GnuCGenerator
 
 from jinja2 import Template
+
+
+CC = "msp430-elf-gcc"
 
 # converts number into bitmap
 def make_bitmap(registers_used):
@@ -231,7 +234,7 @@ if __name__ == "__main__":
         else x
         for x in sys.argv[1:]
     ]
-    call_prog("msp430-gcc", pp_argv)
+    call_prog(CC, pp_argv)
 
     # Now extract the AST from the preprocessed C file
     parser = ext_c_parser.GnuCParser()
@@ -268,7 +271,7 @@ if __name__ == "__main__":
     new_args[new_args.index('-c') + 1] = out_c
     new_args[new_args.index('-o') + 1] = f'{file_name}.o'
 
-    call_prog("msp430-gcc", new_args)
+    call_prog(CC, new_args)
 
     # Store name + bitmap in .o file for later processing by linker
     # NOTE: the `--add-symbol` option is only available for GNU binutils > msp430-gcc;

@@ -68,7 +68,6 @@
 ; pop callee-save registers (except for r6 and r7, carrying metadata about the called untrusted function)
 ; https://mspgcc.sourceforge.net/manual/c1225.html
 .macro pop_callee_save
-    pop r11
     pop r10
     pop r9
     pop r8
@@ -83,7 +82,6 @@
     push r8
     push r9
     push r10
-    push r11
     .endm
 
 ; clear callee-save registers
@@ -105,16 +103,16 @@
 .macro clear_argument_regs
     rra r6
     jc 1f
-    clr r12
-    rra r6
-    jc 1f
-    clr r13
+    clr r15
     rra r6
     jc 1f
     clr r14
     rra r6
     jc 1f
-    clr r15
+    clr r13
+    rra r6
+    jc 1f
+    clr r12
 1:
     .endm
 

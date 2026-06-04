@@ -2,6 +2,6 @@ OPENIPE        = ../framework
 CC              = $(OPENIPE)/compiler.py
 LD              = $(OPENIPE)/linker.py
 
-INCLUDE         = -I$(OPENIPE) -I$(shell msp430-gcc -print-file-name="include")
-CFLAGS          = -Wall -std=gnu99 -g -mcpu=430 -mmpy=none -D__MSP430F149__ -Os
-LDFLAGS         = -L$(shell msp430-gcc -print-file-name="") -T pmem.x
+INCLUDE         = -I$(OPENIPE)
+CFLAGS          = -Wall -std=gnu99 -g -mmcu=msp430f149 -mhwmult=none -D__MSP430F149__ -Os
+LDFLAGS         = -Wl,--no-gc-sections -mmcu=msp430f149 -mhwmult=none -T pmem.x

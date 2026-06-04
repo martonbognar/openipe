@@ -1,4 +1,4 @@
-#!/usr/bin/python3
+#!/openipe_venv/bin/python3
 import sys
 from pathlib import Path
 import re
@@ -10,6 +10,10 @@ from elftools.elf.sections import SymbolTableSection
 
 from jinja2 import Template
 from common import *
+
+CC = "msp430-elf-gcc"
+FLAGS = ['-mmcu=msp430f149', '-mhwmult=none']
+
 
 def get_libipe_path(subpath):
     return Path(sys.argv[0]).resolve().parent / 'libipe' / subpath
@@ -58,7 +62,8 @@ def get_elf_relocations(fn):
                 # Intercept unprotected arithmetic function calls
                 # inserted by the compiler back-end; see also:
                 # https://gcc.gnu.org/onlinedocs/gccint/Integer-library-routines.html
-                if re.match(r'(memset|__(u|)(ashl|ashr|lshr|mul|div|mod)(q|h|s|d|t)i.*)', sym.name):
+                # TODO: match floating point arithmetic
+                if re.match(r'(memset|__mspabi_((mpy|div|rem)(i|l|ll|li|lli|u|ul|ull)|(sr|(ai|li|ap|lp|al|ll|all|lll))|(func_epilog_.*)))', sym.name):
                     info(f'\tL__ intercepting relocation {sym.name}')
                     rel_offset = n * section['sh_entsize']
                     elf_relocations.append((rel_offset, sym.name, section.name))
@@ -69,7 +74,7 @@ def patch_relocs(fn):
     elf_relocations = get_elf_relocations(fn)
     sym_map = {'__ipe_' + sym_name : '.ipe_func' for (_, sym_name, _) in elf_relocations}
     
-    if not is_section_in_file(fn, '.ipe_func'):
+    if not is_section_in_file(fn, '.ipe_func') and len(elf_relocations) > 0:
         create_empty_section(fn, '.ipe_func')
 
     add_sym(fn, sym_map)
@@ -156,18 +161,23 @@ def main():
                 for s in chain.from_iterable(process_filename(f) for f in filenames)}
     
     # resolve arith stub dependencies
-    if 'divhi3' in ipe_syms:
-        ipe_syms.add('udivhi3')
-    elif 'modhi3' in ipe_syms:
-        ipe_syms.add('divhi3')
-        ipe_syms.add('udivhi3')
-    elif 'umodhi3' in ipe_syms:
-        ipe_syms.add('udivhi3')
+    if 'mspabi_divi' in ipe_syms:
+        ipe_syms.add('mspabi_divu')
+    elif 'mspabi_remi' in ipe_syms:
+        ipe_syms.add('mspabi_divi')
+        ipe_syms.add('mspabi_divu')
+    elif 'mspabi_remu' in ipe_syms:
+        ipe_syms.add('mspabi_divu')
     
+    new_syms = list(filter(lambda s: re.match(r'mspabi_func_epilog_.*', s) is None, ipe_syms))
+    if len(new_syms) != len(ipe_syms):
+        new_syms.append('mspabi_func_epilog')
+    ipe_syms = new_syms
+
     # add secure variants of compiler-inserted stubs (arithmetics, memset)
     files_to_compile = []
     for s in ipe_syms:
-        path = get_libipe_path(f'compiler_stubs/ipe_{s.removeprefix("__ipe_").removeprefix("__").removeprefix("_")}.s')
+        path = get_libipe_path(f'compiler_stubs/ipe_{s}.s')
         if not path.exists():
             fatal_error(f'no stub for {s} (looked for {path})')
         else:
@@ -197,11 +207,12 @@ def main():
         with open(files_to_compile[-1], "w") as target_file:
             target_file.write(stubs_template.render(stubs_obj))
 
+
     additional_files_to_link = []
     for file in files_to_compile:
         additional_files_to_link.append(f'{file.stem}.o')
 
-        call_prog("msp430-gcc", ['-c', str(file), '-o', additional_files_to_link[-1]])
+        call_prog(CC, FLAGS + ['-c', str(file), '-o', additional_files_to_link[-1]])
 
 
     default_config = {
@@ -218,7 +229,7 @@ def main():
 
     additional_files_to_link.append(get_tmp(suffix='.o', prefix='ipe_entry_'))
     entry_stub_file = get_libipe_path('stubs/' + default_config['entry_stub'])
-    call_prog("msp430-gcc", ['-c', str(entry_stub_file), '-o', additional_files_to_link[-1]])
+    call_prog(CC, FLAGS + ['-c', str(entry_stub_file), '-o', additional_files_to_link[-1]])
 
 
     linker_args = sys.argv[1:]
@@ -227,7 +238,7 @@ def main():
         linker_args.insert(last_obj_idx + 1, object_name)
 
 
-    call_prog("msp430-gcc", linker_args)
+    call_prog(CC, linker_args)
 
 
 if __name__ == '__main__':

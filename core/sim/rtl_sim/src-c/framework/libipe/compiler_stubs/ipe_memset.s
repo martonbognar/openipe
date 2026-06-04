@@ -4,19 +4,19 @@
     .type __ipe_memset,@function
 
     # void *memset(void s[.n], int c, size_t n);
-    # \in  r15: s
-    # \in  r14: c
-    # \in  r13: n
-    # \out r15: s
+    # \in  r12: s
+    # \in  r13: c
+    # \in  r14: n
+    # \out r12: s
 __ipe_memset:
-    mov     r15, r12
-1:
-    tst     r13
-    jz      2f
-    mov.b   r14, @r15
-    add     #1, r15
-    add     #-1, r13
-    jmp     1b
-2:
-    mov     r12, r15
-    ret
+    add	r12, r14
+    mov	r12, r15
+l1:
+    cmp	r14, r15	
+    jnz	l2  
+    ret			
+l2:
+    inc	r15
+    mov.b	r13, -1(r15)
+    jmp	l1 
+
