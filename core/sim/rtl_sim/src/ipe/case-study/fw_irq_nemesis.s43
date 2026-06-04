@@ -27,7 +27,7 @@ main:
     ; set up interrupt to hit the single-cycle nops
     eint
     mov #0x4, &TACTL
-    mov #0x2A, &TACCR0
+    mov #0x2B, &TACCR0
     mov #0x216, &TACTL
 
     mov #0xcafe, r15  ; signal start
@@ -38,7 +38,7 @@ main:
     ; set up interrupt to hit the seven-cycle instructions
     eint
     mov #0x4, &TACTL
-    mov #0x2A, &TACCR0  ; we subtract two because the SP is already set up
+    mov #0x2B, &TACCR0  ; we subtract two because the SP is already set up
     mov #0x216, &TACTL
 
     mov #0xcafe, r15  ; signal
@@ -83,7 +83,7 @@ ipe_var:
     .sect .ipe_func, "a"
 main_ipe_fn:
     add #1, &ipe_var
-    cmp #2, &ipe_var
+    cmp #3, &ipe_var
     jz 1f
     nop
     nop
