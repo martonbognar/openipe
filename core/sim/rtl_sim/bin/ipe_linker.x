@@ -1,5 +1,4 @@
 OUTPUT_ARCH(msp430)
-ENTRY(_start)
 
 MEMORY {
   SFR              : ORIGIN = 0x0000, LENGTH = 0x0010 /* END=0x0010, size 16 */

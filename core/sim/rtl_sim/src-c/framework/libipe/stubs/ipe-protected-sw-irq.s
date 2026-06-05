@@ -84,13 +84,13 @@ ecall_ret:
 ; r7: address of untrusted function
 ; r6: bitmap of function arguments
 ipe_ocall:
-    push_callee_save
+    push_callee_save_ocall
     clear_argument_regs
     clear_secret_regs
     br #ipe_ocall_cont
 
 ocall_ret:
-    pop_callee_save
+    pop_callee_save_ocall
     ret
 
 ; IPE dispatcher for handling interrupts during unprotected code execution

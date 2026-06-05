@@ -67,6 +67,9 @@ def get_elf_relocations(fn):
                     info(f'\tL__ intercepting relocation {sym.name}')
                     rel_offset = n * section['sh_entsize']
                     elf_relocations.append((rel_offset, sym.name, section.name))
+                elif re.match(r'__mspabi_.*',sym.name):
+                    warning(f"Relocation of symbol {sym.name} is not currently supported by openIPE")
+
 
     return elf_relocations
 

@@ -65,12 +65,15 @@
     clr r4
     .endm
 
-; pop callee-save registers (except for r6 and r7, carrying metadata about the called untrusted function)
-; https://mspgcc.sourceforge.net/manual/c1225.html
+; pop callee-save registers
+; https://www.ti.com/lit/an/slaa534a/slaa534a.pdf
+; https://www.ti.com/lit/an/slaa664/slaa664.pdf
 .macro pop_callee_save
     pop r10
     pop r9
     pop r8
+    pop r7
+    pop r6
     pop r5
     pop r4
     .endm
@@ -79,10 +82,31 @@
 .macro push_callee_save
     push r4
     push r5
+    push r6
+    push r7
     push r8
     push r9
     push r10
     .endm
+
+; pop callee-save registers (except for r6 and r7, carrying metadata about the called untrusted function)
+.macro pop_callee_save_ocall
+    pop r10
+    pop r9
+    pop r8
+    pop r5
+    pop r4
+    .endm
+
+; push callee-save registers
+.macro push_callee_save_ocall
+    push r4
+    push r5
+    push r8
+    push r9
+    push r10
+    .endm
+
 
 ; clear callee-save registers
 ; (excluding r7, carrying metadata about called untrusted function)

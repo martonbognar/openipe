@@ -11,9 +11,10 @@ RUN apt-get update && apt-get install build-essential cmake iverilog tk expect-d
 RUN apt install python3-pyelftools
 
 # Install toolchain
+ARG GCC_VERSION=9.3.1.11
 RUN wget https://dr-download.ti.com/software-development/ide-configuration-compiler-or-debugger/MD-LlCjWuAbzH/9.3.1.2/msp430-gcc-9.3.1.11_linux64.tar.bz2
-RUN tar xjf msp430-gcc-9.3.1.11_linux64.tar.bz2
-RUN mv msp430-gcc-9.3.1.11_linux64 msp430-gcc
+RUN tar xjf msp430-gcc-${GCC_VERSION}_linux64.tar.bz2
+RUN mv msp430-gcc-${GCC_VERSION}_linux64 msp430-gcc
 
 # Install headers
 RUN wget https://dr-download.ti.com/software-development/ide-configuration-compiler-or-debugger/MD-LlCjWuAbzH/9.3.1.2/msp430-gcc-support-files-1.212.zip
@@ -21,10 +22,10 @@ RUN unzip msp430-gcc-support-files-1.212.zip
 RUN cp -a msp430-gcc-support-files/include/*.h msp430-gcc/msp430-elf/include
 RUN cp -a msp430-gcc-support-files/include/*.ld msp430-gcc/msp430-elf/lib
 
-RUN rm -fr msp430-gcc-support-files msp430-gcc-9.3.1.11_linux64.tar.bz2 msp430-gcc-support-files-1.212.zip
+RUN rm -fr msp430-gcc-support-files msp430-gcc-${GCC_VERSION}_linux64.tar.bz2 msp430-gcc-support-files-1.212.zip
 
 RUN echo 'PATH="$PATH:/msp430-gcc/bin"' >> ~/.bashrc
-RUN echo 'PATH="$PATH:/msp430-gcc/libexec/gcc/msp430-elf/9.3.1.11"' >> ~/.bashrc
+RUN echo 'PATH="$PATH:/msp430-gcc/libexec/gcc/msp430-elf/${GCC_VERSION}"' >> ~/.bashrc
 
 # Install 
 ################################################################################
