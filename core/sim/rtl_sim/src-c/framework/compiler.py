@@ -1,4 +1,4 @@
-#!/openipe_venv/bin/python3
+#!/bin/python3
 
 from common import *
 import copy

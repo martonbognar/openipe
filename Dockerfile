@@ -35,6 +35,7 @@ RUN echo 'PATH="$PATH:/msp430-gcc/libexec/gcc/msp430-elf/${GCC_VERSION}"' >> ~/.
 RUN python3 -m venv openipe_venv
 COPY core/sim/rtl_sim/src-c/framework/requirements.txt .
 RUN  ./openipe_venv/bin/pip install -r requirements.txt && rm requirements.txt
+RUN echo 'PATH="/openipe_venv/bin:$PATH"' >> ~/.bashrc
 
 ################################################################################
 # Install the Pandora tool
