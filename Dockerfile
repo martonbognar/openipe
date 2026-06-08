@@ -24,8 +24,8 @@ RUN cp -a msp430-gcc-support-files/include/*.ld msp430-gcc/msp430-elf/lib
 
 RUN rm -fr msp430-gcc-support-files msp430-gcc-${GCC_VERSION}_linux64.tar.bz2 msp430-gcc-support-files-1.212.zip
 
-RUN echo 'PATH="$PATH:/msp430-gcc/bin"' >> ~/.bashrc
-RUN echo 'PATH="$PATH:/msp430-gcc/libexec/gcc/msp430-elf/${GCC_VERSION}"' >> ~/.bashrc
+ENV PATH="$PATH:/msp430-gcc/bin"
+ENV PATH="$PATH:/msp430-gcc/libexec/gcc/msp430-elf/${GCC_VERSION}"
 
 # Install 
 ################################################################################
@@ -35,7 +35,7 @@ RUN echo 'PATH="$PATH:/msp430-gcc/libexec/gcc/msp430-elf/${GCC_VERSION}"' >> ~/.
 RUN python3 -m venv openipe_venv
 COPY core/sim/rtl_sim/src-c/framework/requirements.txt .
 RUN  ./openipe_venv/bin/pip install -r requirements.txt && rm requirements.txt
-RUN echo 'PATH="/openipe_venv/bin:$PATH"' >> ~/.bashrc
+ENV PATH="/openipe_venv/bin:$PATH"
 
 ################################################################################
 # Install the Pandora tool

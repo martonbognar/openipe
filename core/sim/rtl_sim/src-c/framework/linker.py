@@ -43,6 +43,12 @@ def create_empty_section(fn, section_name):
     call_prog('msp430-elf-objcopy', ['--add-section', f'{section_name}={nf}', fn, fn])
 
 
+def get_re_relocs():
+    re = r'(memset|__mspabi_((mpy|div|rem)(i|l|ll|li|lli|u|ul|ull)|(sr|(ai|li|ap|lp|al|ll|all|lll))|(func_epilog_.*)))'
+    re += r'|(__mspabi_(sl|(ll|lll|li)))'
+    return re
+
+
 def get_elf_relocations(fn):
     elf_relocations = []
 
@@ -63,7 +69,7 @@ def get_elf_relocations(fn):
                 # inserted by the compiler back-end; see also:
                 # https://gcc.gnu.org/onlinedocs/gccint/Integer-library-routines.html
                 # TODO: match floating point arithmetic
-                if re.match(r'(memset|__mspabi_((mpy|div|rem)(i|l|ll|li|lli|u|ul|ull)|(sr|(ai|li|ap|lp|al|ll|all|lll))|(func_epilog_.*)))', sym.name):
+                if re.match(get_re_relocs(), sym.name):
                     info(f'\tL__ intercepting relocation {sym.name}')
                     rel_offset = n * section['sh_entsize']
                     elf_relocations.append((rel_offset, sym.name, section.name))
