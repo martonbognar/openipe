@@ -18,6 +18,8 @@ MEMORY {
   ipe_vectors (rw)  : ORIGIN = 0xe3e0,    LENGTH = 0x20
   ipe_meta  (rw)    : ORIGIN = 0xff88,    LENGTH = 0x4
 
+  vectors   (rw)    : ORIGIN = 0xffe0,    LENGTH = 0x20
+
   VECT1            : ORIGIN = 0xFFE0, LENGTH = 0x0002
   VECT2            : ORIGIN = 0xFFE2, LENGTH = 0x0002
   VECT3            : ORIGIN = 0xFFE4, LENGTH = 0x0002
@@ -61,6 +63,13 @@ SECTIONS
     KEEP (*(__interrupt_vector_reset))
     KEEP (*(.resetvec))
   } > RESETVEC
+
+  .vectors  :
+  {
+    PROVIDE (__vectors_start = .) ;
+    *(.vectors*)
+    _vectors_end = . ;
+  }  > vectors
 
   .rodata :
   {

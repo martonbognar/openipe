@@ -20,3 +20,4 @@ __ipe___mspabi_mpyi:
     tst     r11
     jnz     1b
 3:  ret
+

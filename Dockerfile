@@ -12,7 +12,7 @@ RUN apt install python3-pyelftools
 
 # Install toolchain
 ARG GCC_VERSION=9.3.1.11
-RUN wget https://dr-download.ti.com/software-development/ide-configuration-compiler-or-debugger/MD-LlCjWuAbzH/9.3.1.2/msp430-gcc-9.3.1.11_linux64.tar.bz2
+RUN wget https://dr-download.ti.com/software-development/ide-configuration-compiler-or-debugger/MD-LlCjWuAbzH/9.3.1.2/msp430-gcc-${GCC_VERSION}_linux64.tar.bz2
 RUN tar xjf msp430-gcc-${GCC_VERSION}_linux64.tar.bz2
 RUN mv msp430-gcc-${GCC_VERSION}_linux64 msp430-gcc
 
