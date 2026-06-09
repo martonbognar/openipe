@@ -251,7 +251,7 @@ SECTIONS
   {
     PROVIDE (__ipe_seg_start = .) ;
     PROVIDE(__ipe_struct = .);
-    *(.ipestruct*)     /* IPE Data structure                */
+    KEEP (*(.ipestruct*)) /* IPE Data structure                */
     __ipe_rx_start = .;
     *(.ipe_hw_entry*)  /* IPE Single entry point            */
     *(.ipe_func*)      /* IPE functions                     */
@@ -292,7 +292,7 @@ SECTIONS
 
   .ipe_meta  :
   {
-    *(.ipe_meta*);
+    KEEP (*(.ipe_meta*));
     __ipe_struct_shift = __ipe_struct >> 4;
   }  > ipe_meta
 
