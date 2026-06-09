@@ -172,7 +172,7 @@ SECTIONS
     *(.irq_num)
   } > irq_num
 
-  .ipe_seg  :
+  .ipe_seg  : SUBALIGN(2)
   {
     PROVIDE (__ipe_seg_start = .) ;
     PROVIDE(__ipe_struct = .);
