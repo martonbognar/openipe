@@ -110,9 +110,9 @@
 
 ; clear callee-save registers
 ; (excluding r7, carrying metadata about called untrusted function)
-; (including r2, the status register)
+; (including arithmetic status bits (0, 1, 2 and 8) of the status register r2)
 .macro clear_secret_regs
-    clr r2
+    and #0x7ef8, r2
     clr r4
     clr r5
     clr r6

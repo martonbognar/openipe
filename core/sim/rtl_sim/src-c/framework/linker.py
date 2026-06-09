@@ -18,17 +18,31 @@ FLAGS = ['-mmcu=msp430f149', '-mhwmult=none']
 def get_libipe_path(subpath):
     return Path(sys.argv[0]).resolve().parent / 'libipe' / subpath
 
-# The `--add-symbol` option is only available for GNU binutils > msp430-gcc.
-# This function therefore relies on msp430-elf-objcopy from the TI GCC port.
+
+# objcopy only allows adding symbols with a defined value; thus manually
+# patch up the newly added symbol in the symbol table to make it an
+# undefined (external) symbol, such that the linker throws an error if
+# it is not found in the std libraries later
 def add_sym(file, sym_map):
     args = []
 
     for sym, sect in sym_map.items():
-        args += ['--add-symbol', f'{sym}={sect}:0,weak']
+        args += ['--add-symbol', f'{sym}={sect}:0,global']
 
     args += [file, file]
     call_prog('msp430-elf-objcopy', args)
-    return file
+
+    with open(file, 'r+b') as f:
+        elf_file = ELFFile(f)
+        symtab = elf_file.get_section_by_name('.symtab')
+
+        for idx in range(symtab.num_symbols()):
+            sym = symtab.get_symbol(idx)
+            if sym.name in sym_map.keys():
+                entry_off = symtab['sh_offset'] + idx * symtab['sh_entsize']
+                assert symtab['sh_entsize'] == 16
+                f.seek(entry_off + 14)
+                f.write((0).to_bytes(2, byteorder='little')) # SHN_UNDEF
 
 
 def is_section_in_file(fn, section_name):
@@ -41,14 +55,6 @@ def create_empty_section(fn, section_name):
     info(f"creating empty section '{section_name}'...")
     nf = get_tmp(suffix='.bin', prefix='empty_')
     call_prog('msp430-elf-objcopy', ['--add-section', f'{section_name}={nf}', fn, fn])
-
-
-def get_re_relocs():
-    re = r'(memset|__mspabi_((mpy|div|rem)(i|l|ll|li|lli|u|ul|ull)))'
-    re += r'|(__mspabi_sl(ll|lll|li))'
-    re += r'|(__mspabi_sr(ai|li|ap|lp|al|ll|all|lll))'
-    re += r'|(__mspabi_func_epilog_)'
-    return re
 
 
 def get_elf_relocations(fn):
@@ -68,22 +74,16 @@ def get_elf_relocations(fn):
                 sym = symtab.get_symbol(rel['r_info_sym'])
 
                 # Intercept unprotected arithmetic function calls
-                # inserted by the compiler back-end; see also:
-                # https://gcc.gnu.org/onlinedocs/gccint/Integer-library-routines.html
-                # TODO: match floating point arithmetic
-                if re.match(get_re_relocs(), sym.name):
-                    info(f'\tL__ intercepting relocation {sym.name}')
+                # inserted by the compiler back-end
+                if re.match(r'memset|__mspabi_.*',sym.name):
                     rel_offset = n * section['sh_entsize']
                     elf_relocations.append((rel_offset, sym.name, section.name))
-                elif re.match(r'__mspabi_.*',sym.name):
-                    warning(f"Relocation of symbol {sym.name} is not currently supported by openIPE")
-
 
     return elf_relocations
 
 def patch_relocs(fn):
     elf_relocations = get_elf_relocations(fn)
-    sym_map = {'__ipe_' + sym_name : '.ipe_func' for (_, sym_name, _) in elf_relocations}
+    sym_map = {'__ipe' + sym_name : '.ipe_func' for (_, sym_name, _) in elf_relocations}
     
     if not is_section_in_file(fn, '.ipe_func') and len(elf_relocations) > 0:
         create_empty_section(fn, '.ipe_func')
@@ -95,7 +95,7 @@ def patch_relocs(fn):
         elf_file = ELFFile(f)
         symtab = elf_file.get_section_by_name('.symtab')
         for (rela_offset, sym_name, rela_sect_name) in elf_relocations:
-            ipe_sym_name = '__ipe_' + sym_name
+            ipe_sym_name = '__ipe' + sym_name
 
             # get symbol table index of added symbol
             for sym_idx in range(symtab.num_symbols()):
@@ -117,12 +117,10 @@ def patch_relocs(fn):
             f.seek(offset+5)
             f.write(sym_idx.to_bytes(3, byteorder='little'))
 
-    return list(sym_map.keys())
-
 
 def process_filename(filename):
     info(f'processing relocations in: {filename}')
-    return patch_relocs(filename)
+    patch_relocs(filename)
 
 
 def retrieve_stubs_entries(files):
@@ -168,31 +166,24 @@ def retrieve_stubs_entries(files):
 def main():
     # Extract non-option arguments (filenames) and call our custom relocation patcher
     filenames = [arg for arg in sys.argv[1:] if arg.endswith('.o') and not arg.startswith('-')]
-    ipe_syms = {re.split(r'_[0-9]*$', s.removeprefix("__ipe_").removeprefix("__").removeprefix("_"))[0]
-                for s in chain.from_iterable(process_filename(f) for f in filenames)}
+    for f in filenames:
+        process_filename(f)
     
-    # resolve arith stub dependencies
-    if 'mspabi_divi' in ipe_syms:
-        ipe_syms.add('mspabi_divu')
-    elif 'mspabi_remi' in ipe_syms:
-        ipe_syms.add('mspabi_divi')
-        ipe_syms.add('mspabi_divu')
-    elif 'mspabi_remu' in ipe_syms:
-        ipe_syms.add('mspabi_divu')
-    
-    new_syms = list(filter(lambda s: re.match(r'mspabi_func_epilog_.*', s) is None, ipe_syms))
-    if len(new_syms) != len(ipe_syms):
-        new_syms.append('mspabi_func_epilog')
-    ipe_syms = new_syms
+    default_config = {
+        'entry_stub': 'ipe-protected.s'
+    }
+    try:
+        with open("config.json") as config_json:
+            config = json.load(config_json)
+            for k in config:
+                default_config[k] = config[k]
+    except FileNotFoundError:
+        pass
+    info(f'Config used: {default_config}')
 
-    # add secure variants of compiler-inserted stubs (arithmetics, memset)
-    files_to_compile = []
-    for s in ipe_syms:
-        path = get_libipe_path(f'compiler_stubs/ipe_{s}.s')
-        if not path.exists():
-            fatal_error(f'no stub for {s} (looked for {path})')
-        else:
-            files_to_compile.append(path)
+    files_to_compile = [get_libipe_path('stubs/' + default_config['entry_stub'])]
+    files_to_compile.append(get_libipe_path('stubs/ipe_memset.s'))
+
 
     # write generated table file
     dic_stubs_entries = retrieve_stubs_entries(filenames)
@@ -221,26 +212,9 @@ def main():
 
     additional_files_to_link = []
     for file in files_to_compile:
-        additional_files_to_link.append(f'{file.stem}.o')
-
+        out = get_tmp(suffix='.o',prefix=file.stem)
+        additional_files_to_link.append(out)
         call_prog(CC, FLAGS + ['-c', str(file), '-o', additional_files_to_link[-1]])
-
-
-    default_config = {
-        'entry_stub': 'ipe-protected.s'
-    }
-    try:
-        with open("config.json") as config_json:
-            config = json.load(config_json)
-            for k in config:
-                default_config[k] = config[k]
-    except FileNotFoundError:
-        pass
-    info(f'Config used: {default_config}')
-
-    additional_files_to_link.append(get_tmp(suffix='.o', prefix='ipe_entry_'))
-    entry_stub_file = get_libipe_path('stubs/' + default_config['entry_stub'])
-    call_prog(CC, FLAGS + ['-c', str(entry_stub_file), '-o', additional_files_to_link[-1]])
 
 
     linker_args = sys.argv[1:]
