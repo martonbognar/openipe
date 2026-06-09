@@ -37,7 +37,7 @@ RUN cd /msp430-gcc/lib/gcc/msp430-elf/${MSPGCC_VERSION_MAJOR}/430 && \
         # unique temp dir per lib ($$=PID avoids collisions)
         dir=/tmp/ar-$$-${lib} && \
         # create IPE-prefixed variant with renamed symbols and sections
-        msp430-elf-objcopy --prefix-symbols=__ipe --prefix-sections=.ipe_func \
+        msp430-elf-objcopy --prefix-symbols=__ipe --prefix-alloc-sections=.ipe_func \
             ${lib}.a ${lib}-ipe.a && \
         # extract into separate dirs (ar cannot directly merge archives)
         mkdir -p ${dir}/orig ${dir}/ipe && \
