@@ -79,6 +79,8 @@
     .endm
 
 ; push callee-save registers
+; https://www.ti.com/lit/an/slaa534a/slaa534a.pdf
+; https://www.ti.com/lit/an/slaa664/slaa664.pdf
 .macro push_callee_save
     push r4
     push r5

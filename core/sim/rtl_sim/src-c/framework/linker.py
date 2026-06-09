@@ -12,7 +12,7 @@ from jinja2 import Template
 from common import *
 
 CC = "msp430-elf-gcc"
-FLAGS = ['-mmcu=msp430f149', '-mhwmult=none']
+FLAGS = ['-mmcu=msp430f149', '-mhwmult=none', '-fomit-frame-pointer']
 
 
 def get_libipe_path(subpath):
@@ -182,7 +182,7 @@ def main():
     info(f'Config used: {default_config}')
 
     files_to_compile = [get_libipe_path('stubs/' + default_config['entry_stub'])]
-    files_to_compile.append(get_libipe_path('stubs/ipe_memset.s'))
+    files_to_compile.append(get_libipe_path('stubs/ipe-libc.c'))
 
 
     # write generated table file
