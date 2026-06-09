@@ -3,5 +3,6 @@ CC              = python3 $(OPENIPE)/compiler.py
 LD              = python3 $(OPENIPE)/linker.py
 
 INCLUDE         = -I$(OPENIPE)
-CFLAGS          = -Wall -std=gnu99 -g -mmcu=msp430f149 -mhwmult=none -D__MSP430F149__ 
+CFLAGS          = -Wall -std=gnu99 -g -mmcu=msp430f149 -mhwmult=none -D__MSP430F149__
+# to inspect the linker output if needed for troubleshooting: add "-Wl,-Map,output.map" to LDFLAGS
 LDFLAGS         = -mmcu=msp430f149 -mhwmult=none -T pmem.x
