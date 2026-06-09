@@ -1,7 +1,9 @@
 OPENIPE         = ../framework
-CC              = python3 $(OPENIPE)/compiler.py
-LD              = python3 $(OPENIPE)/linker.py
+CC              = $(OPENIPE)/compiler.py
+LD              = $(OPENIPE)/linker.py
+
+CPU             = MSP430F149
 
 INCLUDE         = -I$(OPENIPE)
-CFLAGS          = -Wall -std=gnu99 -g -mmcu=msp430f149 -mhwmult=none -D__MSP430F149__ 
-LDFLAGS         = -mmcu=msp430f149 -mhwmult=none -T pmem.x
+CFLAGS          = -Wall -std=gnu99 -g -mmcu=$(CPU) -mhwmult=none -D__$(CPU)__ 
+LDFLAGS         = -mmcu=$(CPU) -mhwmult=none -T pmem.x
