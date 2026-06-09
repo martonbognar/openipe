@@ -247,7 +247,7 @@ SECTIONS
     *(.irq_num)
   } > irq_num
 
-  .ipe_seg  :
+  .ipe_seg  : SUBALIGN(2)
   {
     PROVIDE (__ipe_seg_start = .) ;
     PROVIDE(__ipe_struct = .);
@@ -540,4 +540,3 @@ PROVIDE(ADC12MCTL15        = 0x008F);
 /************************************************************
 * Interrupt Vectors (offset from 0xFFE0)
 ************************************************************/
-
