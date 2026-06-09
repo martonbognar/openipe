@@ -44,8 +44,10 @@ def create_empty_section(fn, section_name):
 
 
 def get_re_relocs():
-    re = r'(memset|__mspabi_((mpy|div|rem)(i|l|ll|li|lli|u|ul|ull)|(sr|(ai|li|ap|lp|al|ll|all|lll))|(func_epilog_.*)))'
-    re += r'|(__mspabi_(sl|(ll|lll|li)))'
+    re = r'(memset|__mspabi_((mpy|div|rem)(i|l|ll|li|lli|u|ul|ull)))'
+    re += r'|(__mspabi_sl(ll|lll|li))'
+    re += r'|(__mspabi_sr(ai|li|ap|lp|al|ll|all|lll))'
+    re += r'|(__mspabi_func_epilog_)'
     return re
 
 
@@ -166,7 +168,7 @@ def retrieve_stubs_entries(files):
 def main():
     # Extract non-option arguments (filenames) and call our custom relocation patcher
     filenames = [arg for arg in sys.argv[1:] if arg.endswith('.o') and not arg.startswith('-')]
-    ipe_syms = {s.removeprefix("__ipe_").removeprefix("__").removeprefix("_") 
+    ipe_syms = {re.split(r'_[0-9]*$', s.removeprefix("__ipe_").removeprefix("__").removeprefix("_"))[0]
                 for s in chain.from_iterable(process_filename(f) for f in filenames)}
     
     # resolve arith stub dependencies
