@@ -11,21 +11,43 @@ RUN apt-get update && apt-get install build-essential cmake iverilog tk expect-d
 RUN apt install python3-pyelftools
 
 # Install toolchain
-ENV GCC_VERSION=9.3.1.11
-RUN wget https://dr-download.ti.com/software-development/ide-configuration-compiler-or-debugger/MD-LlCjWuAbzH/9.3.1.2/msp430-gcc-${GCC_VERSION}_linux64.tar.bz2
-RUN tar xjf msp430-gcc-${GCC_VERSION}_linux64.tar.bz2
-RUN mv msp430-gcc-${GCC_VERSION}_linux64 msp430-gcc
+ENV MSPGCC_VERSION_MAJOR=9.3.1
+ENV MSPGCC_VERSION_MINOR=${MSPGCC_VERSION_MAJOR}.11
+ENV MSPGCC_SUPPORT_VERSION=1.212
+ENV MSPGCC_URL=https://dr-download.ti.com/software-development/ide-configuration-compiler-or-debugger/MD-LlCjWuAbzH/9.3.1.2
+
+RUN wget ${MSPGCC_URL}/msp430-gcc-${MSPGCC_VERSION_MINOR}_linux64.tar.bz2
+RUN tar xjf msp430-gcc-${MSPGCC_VERSION_MINOR}_linux64.tar.bz2
+RUN mv msp430-gcc-${MSPGCC_VERSION_MINOR}_linux64 msp430-gcc
 
 # Install headers
-RUN wget https://dr-download.ti.com/software-development/ide-configuration-compiler-or-debugger/MD-LlCjWuAbzH/9.3.1.2/msp430-gcc-support-files-1.212.zip
-RUN unzip msp430-gcc-support-files-1.212.zip
+RUN wget ${MSPGCC_URL}/msp430-gcc-support-files-${MSPGCC_SUPPORT_VERSION}.zip
+RUN unzip msp430-gcc-support-files-${MSPGCC_SUPPORT_VERSION}.zip
 RUN cp -a msp430-gcc-support-files/include/*.h msp430-gcc/msp430-elf/include
 RUN cp -a msp430-gcc-support-files/include/*.ld msp430-gcc/msp430-elf/lib
 
-RUN rm -fr msp430-gcc-support-files msp430-gcc-${GCC_VERSION}_linux64.tar.bz2 msp430-gcc-support-files-1.212.zip
+RUN rm -fr msp430-gcc-support-files msp430-gcc-${MSPGCC_VERSION_MINOR}_linux64.tar.bz2 msp430-gcc-support-files-${MSPGCC_SUPPORT_VERSION}.zip
 
 ENV PATH="$PATH:/msp430-gcc/bin"
-ENV PATH="$PATH:/msp430-gcc/libexec/gcc/msp430-elf/${GCC_VERSION}"
+ENV PATH="$PATH:/msp430-gcc/libexec/gcc/msp430-elf/${MSPGCC_VERSION_MINOR}"
+
+# create ipe-renamed compiler libraries
+RUN cd /msp430-gcc/lib/gcc/msp430-elf/${MSPGCC_VERSION_MAJOR}/430 && \
+    for lib in libgcc libmul_none; do \
+        # unique temp dir per lib ($$=PID avoids collisions)
+        dir=/tmp/ar-$$-${lib} && \
+        # create IPE-prefixed variant with renamed symbols and sections
+        msp430-elf-objcopy --prefix-symbols=__ipe --prefix-sections=.ipe_func \
+            ${lib}.a ${lib}-ipe.a && \
+        # extract into separate dirs (ar cannot directly merge archives)
+        mkdir -p ${dir}/orig ${dir}/ipe && \
+        msp430-elf-ar x ${lib}.a    --output ${dir}/orig && \
+        msp430-elf-ar x ${lib}-ipe.a --output ${dir}/ipe && \
+        # repack both sets of objects into a single merged archive
+        rm ${lib}.a && \
+        msp430-elf-ar rcs ${lib}.a ${dir}/orig/*.o ${dir}/ipe/*.o && \
+        rm -rf ${dir}; \
+    done
 
 # Install 
 ################################################################################

@@ -27,24 +27,25 @@ initial
       $write("waiting for main function..     ");
       @(r8==16'hDEAD);
       $display("\t[OK]");
-
+      if(r7 !== 16'd56)
+         tb_error("Wrong unprotected multiplication computed");
+      
       $write("waiting for IPE call..          ");
       @(dut.ipe.ipe_executing);
       $display("\t[OK]");
 
       $write("waiting for IPE return..          ");
-      @(r8==16'hBEEF);
-      $display("\t[OK] %d", r7);
+      @(negedge dut.ipe.ipe_executing);
+      $display("\t[OK]");
+      if(r12 !== 16'd20)
+         tb_error("Wrong IPE multiplication computed");
 
-      if(r7 !== 16'd20)
-         tb_error("Wrong multiplication computed");
+      repeat(20) @(posedge mclk);
 
       stimulus_done = 1;
-
       $display(" ===============================================");
       $display("|               SIMULATION DONE                 |");
       $display("|       (stopped through verilog stimulus)      |");
       $display(" ===============================================");
-
       $finish;
    end
