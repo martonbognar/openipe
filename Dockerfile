@@ -16,24 +16,12 @@ ENV MSPGCC_VERSION_MINOR=${MSPGCC_VERSION_MAJOR}.11
 ENV MSPGCC_SUPPORT_VERSION=1.212
 ENV MSPGCC_URL=https://dr-download.ti.com/software-development/ide-configuration-compiler-or-debugger/MD-LlCjWuAbzH/9.3.1.2
 
-RUN wget ${MSPGCC_URL}/msp430-gcc-${MSPGCC_VERSION_MINOR}_linux64.tar.bz2
-RUN tar xjf msp430-gcc-${MSPGCC_VERSION_MINOR}_linux64.tar.bz2
-RUN mv msp430-gcc-${MSPGCC_VERSION_MINOR}_linux64 msp430-gcc
-
-# Install headers
-RUN wget ${MSPGCC_URL}/msp430-gcc-support-files-${MSPGCC_SUPPORT_VERSION}.zip
-RUN unzip msp430-gcc-support-files-${MSPGCC_SUPPORT_VERSION}.zip
-RUN cp -a msp430-gcc-support-files/include/*.h msp430-gcc/msp430-elf/include
-RUN cp -a msp430-gcc-support-files/include/*.ld msp430-gcc/msp430-elf/lib
-
-RUN rm -fr msp430-gcc-support-files msp430-gcc-${MSPGCC_VERSION_MINOR}_linux64.tar.bz2 msp430-gcc-support-files-${MSPGCC_SUPPORT_VERSION}.zip
-
 ENV PATH="$PATH:/msp430-gcc/bin"
 ENV PATH="$PATH:/msp430-gcc/libexec/gcc/msp430-elf/${MSPGCC_VERSION_MINOR}"
 
 # create ipe-renamed compiler libraries
-COPY install_ipe_stubs.sh .
-RUN ./install_ipe_stubs.sh && rm install_ipe_stubs.sh
+COPY install-ti-gcc.sh .
+RUN ./install-ti-gcc.sh && rm install-ti-gcc.sh
 
 # Install 
 ################################################################################
