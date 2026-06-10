@@ -13,6 +13,8 @@ cp -a msp430-gcc-support-files/include/*.ld msp430-gcc/msp430-elf/lib
 rm -fr msp430-gcc-support-files msp430-gcc-${MSPGCC_VERSION_MINOR}_linux64.tar.bz2 msp430-gcc-support-files-${MSPGCC_SUPPORT_VERSION}.zip
 
 cd msp430-gcc/lib/gcc/msp430-elf/${MSPGCC_VERSION_MAJOR}/430
+export PATH="$PATH:../../../../../bin"
+
 for lib in libgcc libmul_none; do
     # unique temp dir per lib ($$=PID avoids collisions)
     dir=/tmp/ar-$$-${lib}
