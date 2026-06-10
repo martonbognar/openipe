@@ -12,7 +12,7 @@ from jinja2 import Template
 from common import *
 
 CC = "msp430-elf-gcc"
-FLAGS = ['-mmcu=msp430f149', '-mhwmult=none', '-fomit-frame-pointer']
+FLAGS = ['-mmcu=msp430f149', '-mhwmult=none']
 
 
 def get_libipe_path(subpath):
