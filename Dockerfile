@@ -17,7 +17,7 @@ ENV MSPGCC_SUPPORT_VERSION=1.212
 ENV MSPGCC_URL=https://dr-download.ti.com/software-development/ide-configuration-compiler-or-debugger/MD-LlCjWuAbzH/9.3.1.2
 
 ENV PATH="$PATH:/msp430-gcc/bin"
-ENV PATH="$PATH:/msp430-gcc/libexec/gcc/msp430-elf/${MSPGCC_VERSION_MINOR}"
+ENV PATH="$PATH:/msp430-gcc/libexec/gcc/msp430-elf/${MSPGCC_VERSION_MAJOR}"
 
 # create ipe-renamed compiler libraries
 COPY install-ti-gcc.sh .
