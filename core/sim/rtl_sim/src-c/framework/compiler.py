@@ -5,6 +5,8 @@ import copy
 import os
 import sys
 import argparse
+import re
+import fileinput
 
 from pycparser import c_ast
 from pycparserext import ext_c_parser
@@ -197,6 +199,26 @@ class OcallStubCreator(c_ast.NodeVisitor):
                     })
                 insert_ast_func_decl(self.ast, node, suffix="_stub")
 
+def parse_arith_calls(file):
+    current_section = None
+    for line in fileinput.input(file, inplace=True):
+        if line.strip().startswith('.section'):
+            current_section = line.split(',')[0].strip().removeprefix('.section').strip()
+            
+        if re.match(r'(memcmp|memmove|memcpy|memset)|.*__mspabi_.*', line):
+            if current_section == '.ipe_func' or current_section == '.ipe_entry':
+                info(f"Patching {line.removesuffix('\n')} in section {current_section}")
+                line = line.replace('memcmp', '__ipememcmp')
+                line = line.replace('memmove', '__ipememmove')
+                line = line.replace('memcpy', '__ipememcpy')
+                line = line.replace('memset', '__ipememset')
+                line = line.replace('__mspabi_', '__ipe__mspabi_')
+                    
+                    
+        print(line, end='')
+                
+
+
 ###################################################################
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='openIPE compiler')
@@ -268,10 +290,17 @@ if __name__ == "__main__":
                 newFile.write(line + "\n")
 
     new_args = sys.argv[1:].copy()
+    temp_asm_file = get_tmp(suffix='.s')
     new_args[new_args.index('-c') + 1] = out_c
-    new_args[new_args.index('-o') + 1] = f'{file_name}.o'
+    new_args[new_args.index('-o') + 1] = temp_asm_file
 
+    call_prog(CC, new_args + ['-S'])
+    parse_arith_calls(temp_asm_file)
+
+    new_args[new_args.index('-c') + 1] = temp_asm_file
+    new_args[new_args.index('-o') + 1] = f'{file_name}.o'
     call_prog(CC, new_args)
+
 
     # Store name + bitmap in .o file for later processing by linker
     # NOTE: the `--add-symbol` option is only available for GNU binutils > msp430-gcc;
