@@ -7,4 +7,4 @@ CPU             = MSP430F149
 INCLUDE         = -I$(OPENIPE)
 CFLAGS          = -Wall -std=gnu99 -g -mmcu=$(CPU) -mhwmult=none -D__$(CPU)__ -O2
 # to inspect the linker output if needed for troubleshooting: add "-Wl,-Map,output.map" to LDFLAGS
-LDFLAGS         = -mmcu=$(CPU) -mhwmult=none -T ../../bin/ipe_linker.x -O3 -flto
+LDFLAGS         = -mmcu=$(CPU) -mhwmult=none -T pmem.x -O3 -flto

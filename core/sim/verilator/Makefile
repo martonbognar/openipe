@@ -13,11 +13,13 @@ EXE_FILE      = $(BUILD_DIR)/$(EXE_NAME)
 BOOTCODE_ELF  = $(BUILD_DIR)/bootcode.elf
 VERILATOR_HDR = $(BUILD_DIR)/V$(TOPLEVEL).mk
 
-# Memory sizes in bytes — must match core/rtl/verilog/openMSP430_defines.v
+# Configurable memory sizes (bytes) — must match core/rtl/verilog/openMSP430_defines.v
 PMEM_SIZE ?= 41984
 DMEM_SIZE ?= 10240
-BMEM_SIZE ?= 1024
-PER_SIZE  ?= 4096
+
+# Fixed hardware constants
+BMEM_SIZE = 1024
+PER_SIZE  = 4096
 
 # Derived addresses (decimal, for shell arithmetic)
 PMEM_BASE            = $(shell python3 -c "print(0x10000 - $(PMEM_SIZE))")
@@ -32,8 +34,8 @@ VERILOG_INCLUDES = \
     -I$(RTL_DIR)/periph \
     -I$(BENCH_DIR)
 
-DEPS = $(shell pwd)/main.cpp \
-       $(shell pwd)/loguru/loguru.cpp
+DEPS = $(abspath main.cpp) \
+       $(abspath loguru/loguru.cpp)
 
 # Verilator 4.x: suppress known-harmless warnings from legacy Verilog
 VERILATOR_WARNS = -Wno-fatal -Wno-TIMESCALEMOD -Wno-UNOPTFLAT
@@ -61,20 +63,12 @@ $(BUILD_DIR)/pmem_defs.asm: | $(BUILD_DIR)
 	printf '.set PMEM_BASE, %d\n.set MPUIPC0, 0x05AA\n.set MPUIPSEGB2, 0x05AC\n.set MPUIPSEGB1, 0x05AE\n' \
 	    $(PMEM_BASE) > $@
 
-# Linker script from template via Python string.Template
+# Prepend ld symbol definitions to ipe_linker.x so the linker resolves PMEM_BASE etc.
 $(BUILD_DIR)/bootcode.x: $(RTL_SIM_DIR)/bin/ipe_linker.x | $(BUILD_DIR)
-	python3 -c "\
-import string; \
-t = string.Template(open('$<').read()); \
-open('$@','w').write(t.safe_substitute( \
-    per_size=$(PER_SIZE), \
-    dmem_size=$(DMEM_SIZE), \
-    pmem_base=$(PMEM_BASE), \
-    pmem_size=$(PMEM_SIZE), \
-    bmem_base=$(BMEM_BASE), \
-    bmem_total_size=$(BMEM_SIZE), \
-    bmem_ivt_base=$(BMEM_IVT_BASE), \
-    bmem_trampoline_base=$(BMEM_TRAMPOLINE_BASE)))"
+	printf 'PMEM_BASE = %d;\nPMEM_SIZE = %d;\nDMEM_SIZE = %d;\nPER_SIZE = %d;\nBMEM_BASE = %d;\nBMEM_TOTAL_SIZE = %d;\nBMEM_IVT_BASE = %d;\nBMEM_TRAMPOLINE_BASE = %d;\n' \
+	    $(PMEM_BASE) $(PMEM_SIZE) $(DMEM_SIZE) $(PER_SIZE) \
+	    $(BMEM_BASE) $(BMEM_SIZE) $(BMEM_IVT_BASE) $(BMEM_TRAMPOLINE_BASE) > $@
+	cat $< >> $@
 
 $(BOOTCODE_ELF): $(BUILD_DIR)/pmem_defs.asm $(BUILD_DIR)/bootcode.x
 	cd $(BUILD_DIR) && msp430-elf-as -alsm \

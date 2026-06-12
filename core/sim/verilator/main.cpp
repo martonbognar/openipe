@@ -4,34 +4,31 @@
 
 #include <memory>
 #include <vector>
-#include <iostream>
-#include <iomanip>
 #include <fstream>
 #include <sys/stat.h>
 #include <cstdint>
-#include <cassert>
-#include <signal.h>
-#include <stdlib.h>
-#include <stdio.h>
+#include <csignal>
+#include <cstdlib>
+#include <cstdio>
 #include <unistd.h>
 #include <getopt.h>
 
 #include "loguru/loguru.hpp"
 
-using namespace std;
-
-// Default memory sizes (bytes) — match openMSP430_defines.v; overridable at runtime
+// Configurable memory sizes (bytes) — match openMSP430_defines.v
 static uint32_t pmem_size = 41984;
 static uint32_t dmem_size = 10240;
-static uint32_t bmem_size = 1024;
-static uint32_t per_size  = 4096;
+
+// Fixed hardware constants
+static const uint32_t bmem_size = 1024;
+static const uint32_t per_size  = 4096;
 
 const int    CLOCK_FREQUENCY = 20 * 1000000;
 const double TIMESCALE       = 1e-9;
 const int    CLOCK_PERIOD    = (int)(1.0 / (CLOCK_FREQUENCY * TIMESCALE));
 
 static uint64_t   MAX_CYCLES = 100000000ULL;
-static vluint64_t mainTime;
+static uint64_t mainTime;
 
 enum exit_codes { status_success, status_error, status_timeout, status_no_input };
 
@@ -176,14 +173,14 @@ static void print_usage(const char* prog)
         "Run an MSP430 ELF on the openIPE Verilator simulation.\n"
         "\n"
         "Options:\n"
-        "  --firmware FILE    IPE bootcode ELF loaded into bmem\n"
+        "  --firmware FILE    IPE bootcode ELF loaded into bmem (required)\n"
         "  -d, --dump FILE    Write VCD waveform to FILE\n"
         "  --dump-start N     Start VCD dump at cycle N (default 0)\n"
         "  -c, --cycles N     Cycle timeout; 0 = unlimited (default 100M)\n"
         "  --pmem-size N      Program memory size in bytes (default 41984)\n"
+        "                     valid: 1K 2K 4K 8K 12K 16K 24K 32K 41K 48K 51K 54K 55K\n"
         "  --dmem-size N      Data memory size in bytes (default 10240)\n"
-        "  --bmem-size N      Bootcode memory size in bytes (default 1024)\n"
-        "  --per-size N       Peripheral address space size in bytes (default 4096)\n"
+        "                     valid: 128 256 512 1K 2K 4K 5K 8K 10K 16K 24K 32K\n"
         "  -v, --verbose      Increase log verbosity (repeat for more detail)\n"
         "  -h, --help         Show this help\n",
         prog);
@@ -201,8 +198,6 @@ int main(int argc, char** argv)
         {"cycles",     required_argument, nullptr, 'c'},
         {"pmem-size",  required_argument, nullptr, 'P'},
         {"dmem-size",  required_argument, nullptr, 'D'},
-        {"bmem-size",  required_argument, nullptr, 'B'},
-        {"per-size",   required_argument, nullptr, 'E'},
         {"verbose",    no_argument,       nullptr, 'v'},
         {"help",       no_argument,       nullptr, 'h'},
         {nullptr, 0, nullptr, 0}
@@ -221,12 +216,16 @@ int main(int argc, char** argv)
         case 'c': MAX_CYCLES = (uint64_t)std::stoull(optarg); break;
         case 'P': pmem_size  = (uint32_t)std::stoul(optarg, nullptr, 0); break;
         case 'D': dmem_size  = (uint32_t)std::stoul(optarg, nullptr, 0); break;
-        case 'B': bmem_size  = (uint32_t)std::stoul(optarg, nullptr, 0); break;
-        case 'E': per_size   = (uint32_t)std::stoul(optarg, nullptr, 0); break;
         case 'v': verbosity++; break;
         case 'h': print_usage(argv[0]); return 0;
         default:  print_usage(argv[0]); return status_error;
         }
+    }
+
+    if (fw_path.empty()) {
+        fprintf(stderr, "error: --firmware is required\n");
+        print_usage(argv[0]);
+        return status_error;
     }
 
     const uint32_t PMEM_BASE = 0x10000u - pmem_size;
@@ -254,14 +253,12 @@ int main(int argc, char** argv)
     auto recs = parseIHex(prog_ihex);
     unlink(prog_ihex.c_str());
 
-    // ── Load firmware ELF (bmem) if given ────────────────────────────
-    if (!fw_path.empty()) {
-        CHECK_F(file_exists(fw_path.c_str()), "Firmware not found: %s", fw_path.c_str());
-        std::string fw_ihex = objcopy_to_ihex(fw_path);
-        auto fw_recs = parseIHex(fw_ihex);
-        unlink(fw_ihex.c_str());
-        recs.insert(recs.end(), fw_recs.begin(), fw_recs.end());
-    }
+    // ── Load firmware ELF (bmem) ──────────────────────────────────────
+    CHECK_F(file_exists(fw_path.c_str()), "Firmware not found: %s", fw_path.c_str());
+    std::string fw_ihex = objcopy_to_ihex(fw_path);
+    auto fw_recs = parseIHex(fw_ihex);
+    unlink(fw_ihex.c_str());
+    recs.insert(recs.end(), fw_recs.begin(), fw_recs.end());
 
     LOG_F(INFO, "Memory map: PMEM [0x%04x-0x%04x]  DMEM [0x%04x-0x%04x]  BMEM [0x%04x-0x%04x]",
         PMEM_BASE, 0xFFFFu,
