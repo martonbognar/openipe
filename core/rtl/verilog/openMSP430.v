@@ -78,6 +78,7 @@ module  openMSP430 (
     bmem_cen,                                // Bootcode Memory chip enable (low active)
     bmem_din,                                // Bootcode Memory data input (optional)
     bmem_wen,                                // Bootcode Memory write byte enable (low active) (optional)
+    cpuoff,                                  // CPU is turned off
     puc_rst,                                 // Main system reset
     smclk,                                   // ASIC ONLY: SMCLK
     smclk_en,                                // FPGA ONLY: SMCLK enable
@@ -147,6 +148,7 @@ output [`BMEM_MSB:0] bmem_addr;              // Bootcode Memory address
 output               bmem_cen;               // Bootcode Memory chip enable (low active)
 output        [15:0] bmem_din;               // Bootcode Memory data input (optional)
 output         [1:0] bmem_wen;               // Bootcode Memory write enable (low active) (optional)
+output               cpuoff;                 // CPU is turned off
 output               puc_rst;                // Main system reset
 output               smclk;                  // ASIC ONLY: SMCLK
 output               smclk_en;               // FPGA ONLY: SMCLK enable
@@ -203,7 +205,6 @@ wire           [3:0] e_state;
 wire                 exec_done;
 wire                 decode_noirq;
 wire                 cpu_en_s;
-wire                 cpuoff;
 wire                 oscoff;
 wire                 scg0;
 wire                 scg1;

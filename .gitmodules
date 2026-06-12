@@ -1,0 +1,3 @@
+[submodule "core/sim/verilator/loguru"]
+	path = core/sim/verilator/loguru
+	url = https://github.com/emilk/loguru.git
