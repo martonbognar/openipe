@@ -19,5 +19,5 @@ int main(void)
     attest();
     asm("mov %0, r8"::"m"(mac_region[24]) :"r8");
 
-    return 0;
+    EXIT();
 }

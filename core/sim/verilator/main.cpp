@@ -20,23 +20,11 @@
 
 using namespace std;
 
-// Memory sizes (bytes) — must match core/rtl/verilog/openMSP430_defines.v
-#ifndef PMEM_SIZE
-#  define PMEM_SIZE 41984
-#endif
-#ifndef DMEM_SIZE
-#  define DMEM_SIZE 10240
-#endif
-#ifndef BMEM_SIZE
-#  define BMEM_SIZE 1024
-#endif
-#ifndef PER_SIZE
-#  define PER_SIZE  4096
-#endif
-
-static constexpr uint32_t PMEM_BASE = 0x10000u - PMEM_SIZE;
-static constexpr uint32_t DMEM_BASE = PER_SIZE;
-static constexpr uint32_t BMEM_BASE = PER_SIZE + DMEM_SIZE;
+// Default memory sizes (bytes) — match openMSP430_defines.v; overridable at runtime
+static uint32_t pmem_size = 41984;
+static uint32_t dmem_size = 10240;
+static uint32_t bmem_size = 1024;
+static uint32_t per_size  = 4096;
 
 const int    CLOCK_FREQUENCY = 20 * 1000000;
 const double TIMESCALE       = 1e-9;
@@ -192,6 +180,10 @@ static void print_usage(const char* prog)
         "  -d, --dump FILE    Write VCD waveform to FILE\n"
         "  --dump-start N     Start VCD dump at cycle N (default 0)\n"
         "  -c, --cycles N     Cycle timeout; 0 = unlimited (default 100M)\n"
+        "  --pmem-size N      Program memory size in bytes (default 41984)\n"
+        "  --dmem-size N      Data memory size in bytes (default 10240)\n"
+        "  --bmem-size N      Bootcode memory size in bytes (default 1024)\n"
+        "  --per-size N       Peripheral address space size in bytes (default 4096)\n"
         "  -v, --verbose      Increase log verbosity (repeat for more detail)\n"
         "  -h, --help         Show this help\n",
         prog);
@@ -207,6 +199,10 @@ int main(int argc, char** argv)
         {"dump",       required_argument, nullptr, 'd'},
         {"dump-start", required_argument, nullptr, 's'},
         {"cycles",     required_argument, nullptr, 'c'},
+        {"pmem-size",  required_argument, nullptr, 'P'},
+        {"dmem-size",  required_argument, nullptr, 'D'},
+        {"bmem-size",  required_argument, nullptr, 'B'},
+        {"per-size",   required_argument, nullptr, 'E'},
         {"verbose",    no_argument,       nullptr, 'v'},
         {"help",       no_argument,       nullptr, 'h'},
         {nullptr, 0, nullptr, 0}
@@ -223,11 +219,19 @@ int main(int argc, char** argv)
         case 'd': vcd_path   = optarg; break;
         case 's': dump_start = (uint64_t)std::stoull(optarg); break;
         case 'c': MAX_CYCLES = (uint64_t)std::stoull(optarg); break;
+        case 'P': pmem_size  = (uint32_t)std::stoul(optarg, nullptr, 0); break;
+        case 'D': dmem_size  = (uint32_t)std::stoul(optarg, nullptr, 0); break;
+        case 'B': bmem_size  = (uint32_t)std::stoul(optarg, nullptr, 0); break;
+        case 'E': per_size   = (uint32_t)std::stoul(optarg, nullptr, 0); break;
         case 'v': verbosity++; break;
         case 'h': print_usage(argv[0]); return 0;
         default:  print_usage(argv[0]); return status_error;
         }
     }
+
+    const uint32_t PMEM_BASE = 0x10000u - pmem_size;
+    const uint32_t DMEM_BASE = per_size;
+    const uint32_t BMEM_BASE = per_size + dmem_size;
 
     // Configure loguru without touching argv (avoids -v flag conflicts)
     loguru::g_preamble_thread = false;
@@ -261,8 +265,8 @@ int main(int argc, char** argv)
 
     LOG_F(INFO, "Memory map: PMEM [0x%04x-0x%04x]  DMEM [0x%04x-0x%04x]  BMEM [0x%04x-0x%04x]",
         PMEM_BASE, 0xFFFFu,
-        DMEM_BASE, DMEM_BASE + DMEM_SIZE - 1,
-        BMEM_BASE, BMEM_BASE + BMEM_SIZE - 1);
+        DMEM_BASE, DMEM_BASE + dmem_size - 1,
+        BMEM_BASE, BMEM_BASE + bmem_size - 1);
 
     // ── Verilator init ────────────────────────────────────────────────
     Verilated::commandArgs(argc, argv);
@@ -279,9 +283,9 @@ int main(int argc, char** argv)
     Memory bmem("[BMEM]", &top.bmem_cen, (CData*)&top.bmem_wen, &top.bmem_addr, &top.bmem_din, &top.bmem_dout);
     Memory dmem("[DMEM]", &top.dmem_cen, (CData*)&top.dmem_wen, &top.dmem_addr, &top.dmem_din, &top.dmem_dout);
 
-    pmem.load(recs, PMEM_BASE, PMEM_SIZE);
-    bmem.load(recs, BMEM_BASE, BMEM_SIZE);
-    dmem.load(recs, DMEM_BASE, DMEM_SIZE);
+    pmem.load(recs, PMEM_BASE, pmem_size);
+    bmem.load(recs, BMEM_BASE, bmem_size);
+    dmem.load(recs, DMEM_BASE, dmem_size);
 
     tracer_enabled = !vcd_path.empty();
     if (tracer_enabled) {

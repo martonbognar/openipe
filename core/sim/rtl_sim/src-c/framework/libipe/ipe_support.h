@@ -64,4 +64,7 @@ int constant_time_cmp(const unsigned char *x_, const unsigned char *y_, const un
 #undef always_inline
 #define always_inline static inline __attribute__((always_inline))
 
+/* Set CPUOFF + SCG1 in the status register (LPM3 — CPU halted, ipe-sim detects this) */
+#define EXIT() asm volatile("bis #0x210, r2")
+
 #endif /* IPE_SUPPORT_H_ */

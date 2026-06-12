@@ -41,10 +41,5 @@ int main(void)
     asm("mov %0, r8" ::"r"(rv) : "r8");
     asm("mov %0, r9" ::"r"(0xcacb) : "r9");
 
-    while (1)
-    {
-        __no_operation();
-    }
-
-    return 0;
+    EXIT();
 }

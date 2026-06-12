@@ -3,6 +3,9 @@ import sys
 from pathlib import Path
 import json
 import argparse
+import string
+import tempfile
+import atexit
 
 from elftools.elf.elffile import ELFFile
 from elftools.elf.sections import SymbolTableSection
@@ -12,6 +15,44 @@ from common import *
 
 CC = "msp430-elf-gcc"
 FLAGS = ['-mmcu=msp430f149', '-mhwmult=none']
+
+# Default memory sizes (bytes) — must match openMSP430_defines.v
+PMEM_SIZE_DEFAULT = 41984
+DMEM_SIZE_DEFAULT = 10240
+BMEM_SIZE_DEFAULT = 1024
+PER_SIZE_DEFAULT  = 4096
+
+
+def _parse_size(s):
+    s = s.strip()
+    if s.upper().endswith('K'):
+        return int(s[:-1]) * 1024
+    return int(s, 0)
+
+
+def _make_linker_script(template_path, pmem_size, dmem_size, bmem_size, per_size):
+    pmem_base            = 0x10000 - pmem_size
+    bmem_base            = per_size + dmem_size
+    bmem_ivt_base        = bmem_base + bmem_size - 0x24
+    bmem_trampoline_base = bmem_base + bmem_size - 0x4
+    with open(template_path) as f:
+        tmpl = string.Template(f.read())
+    content = tmpl.safe_substitute(
+        per_size=per_size,
+        dmem_size=dmem_size,
+        pmem_base=pmem_base,
+        pmem_size=pmem_size,
+        bmem_base=bmem_base,
+        bmem_total_size=bmem_size,
+        bmem_ivt_base=bmem_ivt_base,
+        bmem_trampoline_base=bmem_trampoline_base,
+    )
+    tmp = tempfile.NamedTemporaryFile(mode='w', suffix='.x', delete=False,
+                                      prefix='ipe_linker_')
+    tmp.write(content)
+    tmp.close()
+    atexit.register(lambda p: Path(p).unlink(missing_ok=True), tmp.name)
+    return tmp.name
 
 
 def get_libipe_path(subpath):
@@ -59,18 +100,52 @@ def retrieve_stubs_entries(files):
     return dic_stubs_entries
 
 def main():
-    parser = argparse.ArgumentParser(description='openIPE compiler')
+    # Strip --pmem/dmem/bmem/per-size args before passing anything to gcc
+    pmem_size = PMEM_SIZE_DEFAULT
+    dmem_size = DMEM_SIZE_DEFAULT
+    bmem_size = BMEM_SIZE_DEFAULT
+    per_size  = PER_SIZE_DEFAULT
+    raw_args  = sys.argv[1:]
+    filtered  = []
+    i = 0
+    while i < len(raw_args):
+        if raw_args[i] == '--pmem-size':
+            pmem_size = _parse_size(raw_args[i + 1]); i += 2
+        elif raw_args[i] == '--dmem-size':
+            dmem_size = _parse_size(raw_args[i + 1]); i += 2
+        elif raw_args[i] == '--bmem-size':
+            bmem_size = _parse_size(raw_args[i + 1]); i += 2
+        elif raw_args[i] == '--per-size':
+            per_size  = _parse_size(raw_args[i + 1]); i += 2
+        else:
+            filtered.append(raw_args[i]); i += 1
+
+    # If -T points to a template (contains $pmem_base placeholder), process it
+    for j, arg in enumerate(filtered):
+        if arg == '-T' and j + 1 < len(filtered):
+            try:
+                with open(filtered[j + 1]) as f:
+                    content = f.read()
+                if '$pmem_base' in content:
+                    filtered[j + 1] = _make_linker_script(
+                        filtered[j + 1], pmem_size, dmem_size, bmem_size, per_size)
+            except OSError:
+                pass
+            break
+
+    parser = argparse.ArgumentParser(description='openIPE linker')
     parser.add_argument(
         '--config-file',
         dest='config_file',
         default='config.json',
         help='Path to the configuration file',
     )
-    python_args, ld_args = parser.parse_known_args()
-    
+    python_args, ld_args = parser.parse_known_args(filtered)
+
     # Extract non-option arguments (filenames)
     filenames = [arg for arg in ld_args if arg.endswith('.o') and not arg.startswith('-')]
-    
+
+
     default_config = {
         'entry_stub': 'ipe-protected.s'
     }
@@ -120,10 +195,9 @@ def main():
 
 
     linker_args = ld_args
-    for object_name  in additional_files_to_link:
+    for object_name in additional_files_to_link:
         last_obj_idx = max(idx for idx, val in enumerate(linker_args) if val.endswith('.o'))
         linker_args.insert(last_obj_idx + 1, object_name)
-
 
     call_prog(CC, linker_args)
 

@@ -59,10 +59,6 @@ int main(void)
     asm __volatile__("mov %0, r7" :: "r"(result) : "r7"); 
     asm __volatile__("mov %0, r8" ::"r"(0xcaca) : "r8"); 
     
-    while (1)
-    {
-        __no_operation();
-    }
-    return 0;
+    EXIT();
 }
 
