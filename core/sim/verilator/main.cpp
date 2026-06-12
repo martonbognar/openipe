@@ -108,7 +108,7 @@ public:
     void eval(bool rising)
     {
         if (!*_cen && *_wen != 0b11 && rising)
-            write(_prev_addr, *_wen, *_din);
+            write(*_addr, *_wen, *_din);
         if (rising) *_dout = read(_prev_addr);
         if (!*_cen)  _prev_addr = *_addr;
     }
@@ -338,7 +338,15 @@ int main(int argc, char** argv)
         mainTime++;
     }
 
-    LOG_F(INFO, "Simulation done: %llu cycles.", (unsigned long long)(mainTime / CLOCK_PERIOD));
+    uint64_t done_cycles = mainTime / CLOCK_PERIOD;
+    LOG_F(INFO, "Simulation done: %llu cycles.", (unsigned long long)done_cycles);
+
+    if (result == status_success)
+        printf("PASS: cpuoff after %llu cycles\n", (unsigned long long)done_cycles);
+    else
+        printf("FAIL: %s after %llu cycles\n",
+               result == status_timeout ? "timeout" : "aborted",
+               (unsigned long long)done_cycles);
 
     // Destroy model before tracer so Verilator can finalize any pending trace data
     top_g.reset();
