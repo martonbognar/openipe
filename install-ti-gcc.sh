@@ -1,5 +1,9 @@
 #!/bin/bash
 
+export MSPGCC_VERSION_MAJOR=9.3.1
+export MSPGCC_VERSION_MINOR=${MSPGCC_VERSION_MAJOR}.11
+export MSPGCC_SUPPORT_VERSION=1.212
+
 wget ${MSPGCC_URL}/msp430-gcc-${MSPGCC_VERSION_MINOR}_linux64.tar.bz2
 tar xjf msp430-gcc-${MSPGCC_VERSION_MINOR}_linux64.tar.bz2
 mv msp430-gcc-${MSPGCC_VERSION_MINOR}_linux64 msp430-gcc

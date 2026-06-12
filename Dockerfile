@@ -11,15 +11,15 @@ RUN apt-get update && apt-get install build-essential cmake iverilog tk expect-d
 RUN apt install python3-pyelftools
 
 # Install toolchain
-ENV MSPGCC_VERSION_MAJOR=9.3.1
-ENV MSPGCC_VERSION_MINOR=${MSPGCC_VERSION_MAJOR}.11
-ENV MSPGCC_SUPPORT_VERSION=1.212
 ENV MSPGCC_URL=https://dr-download.ti.com/software-development/ide-configuration-compiler-or-debugger/MD-LlCjWuAbzH/9.3.1.2
 
 # create ipe-renamed compiler libraries
 COPY install-ti-gcc.sh .
 RUN ./install-ti-gcc.sh && rm install-ti-gcc.sh
 
+ENV MSPGCC_VERSION_MAJOR=9.3.1
+ENV MSPGCC_VERSION_MINOR=${MSPGCC_VERSION_MAJOR}.11
+ENV MSPGCC_SUPPORT_VERSION=1.212
 ENV PATH="$PATH:/msp430-gcc/bin"
 
 # Install 
