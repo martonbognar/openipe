@@ -90,11 +90,6 @@ $ ./scripts/isolation_tests.sh
 ...
 ```
 
-### Software development framework workflow
-
-The example `./scripts/framework_hello.sh` demonstrates how to apply our mitigation framework to C projects and run them on openIPE.
-This script runs the framework on a simple hello world C IPE project then executes it in the simulator, obtaining some performance measurements.
-
 ### Attestation case study
 
 The script `./scripts/framework_attestation.sh` runs the framework on the attestation code adapted from VRASED and runs it on openIPE, reporting on the total number of cycles elapsed.
@@ -108,6 +103,94 @@ For example, you can run `./scripts/framework_hello.sh` first to generate the si
 The script `./scripts/symbolic_ipe.sh` performs the security validation if the binary contains a valid IPE region, while `./scripts/symbolic_firmware.sh` will validate the firmware code.
 
 The Pandora reports will be stored in the `logs/symbolic_ipe/` and `logs/symbolic_firmware/` directories, respectively. If you use docker compose or manually map the volumes, you will be able to access these logs on your host machine and open them in a browser.
+
+## Software development framework
+
+The [`framework/`](core/sim/rtl_sim/src-c/framework) directory provides a **source-to-source C compilation toolchain** that automates the boilerplate required to safely call in and out of the IPE-protected region. `compiler.py` and `linker.py` act as drop-in replacements for `msp430-elf-gcc` and are wired in via `Makefile.include`:
+
+```makefile
+CC = $(OPENIPE)/compiler.py
+LD = $(OPENIPE)/linker.py
+```
+
+### Annotations
+
+Annotate C code with macros from `libipe/ipe_support.h`:
+
+| Macro       | Purpose                                                   |
+|-------------|-----------------------------------------------------------|
+| `IPE_ENTRY` | Entry point callable from untrusted code (ecall)          |
+| `IPE_FUNC`  | Internal IPE function (not directly callable from outside)|
+| `IPE_VAR`   | Protected variable (placed in `.ipe_vars`)                |
+| `IPE_CONST` | Protected constant (placed in `.ipe_const`)               |
+
+One compilation unit must also include `DECLARE_IPE_STRUCT;` to emit the hardware initialization structure.
+
+### Toolchain flow
+
+```
+  annotated C sources    libraries (libgcc.a, ...)
+         │                       │
+         ▼                       │
+     compiler.py                 │
+ (src→src AST transform)         │
+         │                       │
+         ▼                       │
+    .o files                     │
+         │                       │
+         └──────────┬────────────┘
+                    ▼
+                linker.py
+          (generate stubs + link)
+                    │
+                    ▼
+             final ELF binary
+        ┌────────────────────────┐
+        │   IPE-protected region │  ← hardware boundary
+        ├────────────────────────┤
+        │   untrusted code/data  │
+        └────────────────────────┘
+```
+
+### Toolchain components
+
+**compiler.py** performs a source-to-source AST transformation (via pycparser) on each annotated file:
+- `IPE_ENTRY fn()` is split: the body moves to `fn_internal()` inside the IPE region; `fn()` becomes a generated ecall stub.
+- Calls from IPE code to untrusted functions are rewritten to `fn_stub()` (ocall trampolines).
+- Calls to compiler helper routines (`libgcc.a`) are intercepted at assembly level and rewritten to secure, intra-IPE variants.
+- Argument register usage (r12–r15) is encoded as a bitmap and embedded as weak ELF symbols (`__ipe_ecall_*`, `__ipe_ocall_*`) for the linker.
+
+**linker.py** reads those symbols across all object files, instantiates assembly templates to produce the entry-dispatch table and ocall stubs, and links everything with a custom linker script. Different versions of IPE entry stubs (e.g., with or without secure interrupt support) can be specified via a JSON config file.
+
+### Ecall/ocall flow
+
+The runtime stubs implement the ecall/ocall entry points in assembly, with register clearing to prevent leakage across the IPE boundary.
+
+```
+   main   untrusted stub             IPE "enclave"
+     |          |          ╔══════════════════════════════╗
+     │          │          ║  IPE stub         IPE app    ║
+     ├─ fn ────>│          ║     │                │       ║
+     │          ├─ ipe_entry ──>─┤                │       ║
+     │          │          ║     ├─ fn_internal ─>│       ║
+     │          │          ║     │                │ ...   ║
+     │          │          ║     │<─ ocall_cb_fn ─┤       ║
+     │          │<─ ocall_stub ──┤                │       ║
+     │<─ cb_fn ─┤          ║     │                │       ║
+ ... │          │          ║     │                │       ║
+     ├── ret ──>│          ║     │                │       ║
+     │          ├─ ipe_entry ──>─┤                │       ║
+     │          │          ║     ├─ ocall ret ───>│       ║
+     │          │          ║     │                │ ...   ║
+     │          │          ║     │<─── ecall ret ─┤       ║
+     │          │<─ ecall ret ───┤                │       ║
+     │<─ ret ───┤          ║                              ║
+     │          │          ╚══════════════════════════════╝
+```
+
+**Ecalls (untrusted->IPE)** route through the single hardware entry point `ipe_entry`, which initializes secure registers and stack, before dispatching to `fn_internal()`.
+
+**Ocalls (IPE->untrusted)** use a generated trampoline `ocall_cb_fn()` that lives _inside_ the IPE region: it saves and clears secret registers, calls the untrusted `cb_fn()`, and the untrusted return re-enters IPE via `ipe_entry` to restore trusted registers before resuming.
 
 ## Extending the codebase
 
