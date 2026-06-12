@@ -36,6 +36,8 @@ MEMORY {
   RESETVEC         : ORIGIN = 0xFFFE, LENGTH = 0x0002
 
   vectors   (rw)    : ORIGIN = 0xffe0,    LENGTH = 0x20
+  vectors64 (rw)    : ORIGIN = 0xff80,    LENGTH = 0x40
+  vectors32 (rw)    : ORIGIN = 0xffc0,    LENGTH = 0x20
   irq_num (rwx)     : ORIGIN = 0xffb0,    LENGTH = 0x2
 }
 
@@ -63,6 +65,18 @@ SECTIONS
     KEEP (*(.resetvec))
   } > RESETVEC
 
+  .vectors32  :
+  {
+     PROVIDE (__vectors32_start = .) ;
+    *(.vectors32*)
+     _vectors32_end = . ;
+  }  > vectors32
+  .vectors64  :
+  {
+     PROVIDE (__vectors64_start = .) ;
+    *(.vectors64*)
+     _vectors64_end = . ;
+  }  > vectors64
   .vectors  :
   {
      PROVIDE (__vectors_start = .) ;
