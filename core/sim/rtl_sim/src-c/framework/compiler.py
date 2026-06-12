@@ -205,7 +205,7 @@ def parse_arith_calls(file):
         if line.strip().startswith('.section'):
             current_section = line.split(',')[0].strip().removeprefix('.section').strip()
             
-        if re.match(r'(memcmp|memmove|memcpy|memset)|.*__mspabi_.*', line):
+        if re.match(r'.*((memcmp|memmove|memcpy|memset)|__mspabi_).*', line):
             if current_section == '.ipe_func' or current_section == '.ipe_entry':
                 info(f"Patching {line.removesuffix('\n')} in section {current_section}")
                 line = line.replace('memcmp', '__ipememcmp')
