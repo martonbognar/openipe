@@ -7,7 +7,7 @@ ARG DEBIAN_FRONTEND=noninteractive
 # Basic dependencies
 ################################################################################
 
-RUN apt-get update && apt-get install build-essential cmake iverilog tk expect-dev git python3 python3-pip python3-venv wget unzip -y
+RUN apt-get update && apt-get install build-essential cmake iverilog tk expect-dev git python3 python3-pip python3-venv wget unzip verilator -y
 RUN apt install python3-pyelftools
 
 # Install toolchain
