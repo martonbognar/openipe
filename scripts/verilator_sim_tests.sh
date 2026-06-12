@@ -23,7 +23,7 @@ for prog in ipe-hello ipe-mul ipe-hmac ipe-simple-rsa; do
 
     echo "=== Simulating $prog ==="
     set +e
-    "$IPE_SIM" --firmware "$BOOTCODE" -c 100000 "$SRC_C/$prog/$prog.elf"
+    "$IPE_SIM" --firmware "$BOOTCODE" "$SRC_C/$prog/$prog.elf"
     ret=$?
     set -e
 

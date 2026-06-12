@@ -2,16 +2,16 @@ OUTPUT_ARCH(msp430)
 
 MEMORY {
   SFR              : ORIGIN = 0x0000, LENGTH = 0x0010 /* END=0x0010, size 16 */
-  RAM              : ORIGIN = $per_size, LENGTH = $dmem_size /* END=0x09FF, size 2048 */
+  RAM              : ORIGIN = PER_SIZE, LENGTH = DMEM_SIZE /* END=0x09FF, size 2048 */
   INFOMEM          : ORIGIN = 0x1000, LENGTH = 0x0100 /* END=0x10FF, size 256 as 2 128-byte segments */
   INFOA            : ORIGIN = 0x1080, LENGTH = 0x0080 /* END=0x10FF, size 128 */
   INFOB            : ORIGIN = 0x1000, LENGTH = 0x0080 /* END=0x107F, size 128 */
 
-  ROM (rx)         : ORIGIN = $pmem_base, LENGTH = $pmem_size /* END=0xFFDF, size 61152 */
+  ROM (rx)         : ORIGIN = PMEM_BASE, LENGTH = PMEM_SIZE /* END=0xFFDF, size 61152 */
 
-  bootcode  (rwx)   : ORIGIN = $bmem_base, LENGTH = $bmem_total_size
-  bootcode_ivt (rw) : ORIGIN = $bmem_ivt_base, LENGTH = 0x20
-  fw_trampoline (rwx) : ORIGIN = $bmem_trampoline_base, LENGTH = 0x4
+  bootcode  (rwx)   : ORIGIN = BMEM_BASE, LENGTH = BMEM_TOTAL_SIZE
+  bootcode_ivt (rw) : ORIGIN = BMEM_IVT_BASE, LENGTH = 0x20
+  fw_trampoline (rwx) : ORIGIN = BMEM_TRAMPOLINE_BASE, LENGTH = 0x4
 
   ipe_seg   (rwx)   : ORIGIN = 0x8000,    LENGTH = 0x6400
   ipe_padding (rw) :  ORIGIN = 0xe3de,    LENGTH = 0x2
