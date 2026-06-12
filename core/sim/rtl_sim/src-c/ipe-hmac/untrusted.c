@@ -1,6 +1,6 @@
 #include <msp430.h>
 
-#include "../framework/libipe/ipe_support.h"
+#include "libipe/ipe_support.h"
 
 
 int IPE_ENTRY attest(void);
