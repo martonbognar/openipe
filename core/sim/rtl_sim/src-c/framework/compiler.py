@@ -199,6 +199,7 @@ class OcallStubCreator(c_ast.NodeVisitor):
                     })
                 insert_ast_func_decl(self.ast, node, suffix="_stub")
 
+
 def parse_arith_calls(file):
     current_section = None
     for line in fileinput.input(file, inplace=True):
@@ -213,8 +214,7 @@ def parse_arith_calls(file):
                 line = line.replace('memcpy', '__ipememcpy')
                 line = line.replace('memset', '__ipememset')
                 line = line.replace('__mspabi_', '__ipe__mspabi_')
-                    
-                    
+                                     
         print(line, end='')
                 
 

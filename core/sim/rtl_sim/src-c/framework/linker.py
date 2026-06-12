@@ -60,7 +60,7 @@ def retrieve_stubs_entries(files):
     return dic_stubs_entries
 
 def main():
-    # Extract non-option arguments (filenames) and call our custom relocation patcher
+    # Extract non-option arguments (filenames)
     filenames = [arg for arg in sys.argv[1:] if arg.endswith('.o') and not arg.startswith('-')]
     
     default_config = {
