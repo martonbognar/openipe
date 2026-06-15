@@ -1,9 +1,8 @@
 #!/usr/bin/env python3
 import sys
 from pathlib import Path
-import re
 import json
-from itertools import chain
+import argparse
 
 from elftools.elf.elffile import ELFFile
 from elftools.elf.sections import SymbolTableSection
@@ -60,14 +59,23 @@ def retrieve_stubs_entries(files):
     return dic_stubs_entries
 
 def main():
+    parser = argparse.ArgumentParser(description='openIPE compiler')
+    parser.add_argument(
+        '--config-file',
+        dest='config_file',
+        default='config.json',
+        help='Path to the configuration file',
+    )
+    python_args, ld_args = parser.parse_known_args()
+    
     # Extract non-option arguments (filenames)
-    filenames = [arg for arg in sys.argv[1:] if arg.endswith('.o') and not arg.startswith('-')]
+    filenames = [arg for arg in ld_args if arg.endswith('.o') and not arg.startswith('-')]
     
     default_config = {
         'entry_stub': 'ipe-protected.s'
     }
     try:
-        with open("config.json") as config_json:
+        with open(python_args.config_file) as config_json:
             config = json.load(config_json)
             for k in config:
                 default_config[k] = config[k]
@@ -111,7 +119,7 @@ def main():
         call_prog(CC, FLAGS + ['-c', str(file), '-o', additional_files_to_link[-1]])
 
 
-    linker_args = sys.argv[1:]
+    linker_args = ld_args
     for object_name  in additional_files_to_link:
         last_obj_idx = max(idx for idx, val in enumerate(linker_args) if val.endswith('.o'))
         linker_args.insert(last_obj_idx + 1, object_name)
