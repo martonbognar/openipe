@@ -1,4 +1,10 @@
-.include "../../bin/ipe_macros.asm"
+;;;;; ugly hack to determine include path depending on C or ASM test
+
+.ifdef __IPE_CUSTOM_IVT
+    .include "../bin/ipe_macros.asm"
+.else
+    .include "ipe_macros.asm"
+.endif
 
     ;; exported symbols
     .global ipe_ocall
@@ -62,11 +68,11 @@ ecall_ret:
 ; r7: address of untrusted function
 ; r6: bitmap of function arguments
 ipe_ocall:
-    push_callee_save
+    push_callee_save_ocall
     clear_argument_regs
     clear_secret_regs
     br #ipe_ocall_cont
 
 ocall_ret:
-    pop_callee_save
+    pop_callee_save_ocall
     ret

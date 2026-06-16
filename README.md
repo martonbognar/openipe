@@ -5,12 +5,13 @@
 ---
 
 # openIPE: An Extensible Memory Isolation Framework for Microcontrollers
+
 [![Build Status](https://github.com/martonbognar/openipe/actions/workflows/ci.yaml/badge.svg)](https://github.com/martonbognar/openipe/actions/workflows/ci.yaml)
  [![License](https://img.shields.io/badge/License-BSD_3--Clause-blue.svg)](https://opensource.org/licenses/BSD-3-Clause)
 ![Docker pulls](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fghcr-badge.elias.eu.org%2Fapi%2Fmartonbognar%2Fopenipe%2Fopenipe&query=downloadCount&label=Docker+pulls&logo=github)
 
 This repository contains [openIPE](https://mici.hu/papers/bognar25openipe.pdf), a microcontroller design based on [openMSP430](https://github.com/olgirard/openmsp430), implementing Texas Instruments' [Intellectual Property Encapsulation (IPE)](https://www.ti.com/lit/an/slaa685/slaa685.pdf#page=9) memory isolation feature and featuring a firmware layer that can be used to implement various security-critical features.
-Aside from the source code of the microcontroller and applications, the repository contains a unit-test suite and uses a symbolic-execution tool to validate properties of either IPE application or firmware code.
+Aside from the source code of the microcontroller and applications, the repository contains a unit test suite and uses a symbolic execution tool to validate properties of either IPE application or firmware code.
 
 If you extend or improve upon our work, please consider submitting a pull request and cite openIPE as the following:
 
@@ -28,38 +29,29 @@ For a complete introduction to this work, we also strongly encourage reading our
 ## Installation
 
 ### Docker setup
-We recommend using [Docker](https://www.docker.com/).
-This latest container image containing all dependencies and setup code can be retrieved as follows:
 
-```
-$ docker pull ghcr.io/martonbognar/openipe:latest
-```
-
-Once the image is pulled, you can start a new instance with the `core` directory mounted as a volume.
-This will allow you to edit the source files on your own machine and execute scripts on them inside the container.
+We recommend using [Docker Compose](https://docs.docker.com/compose/) for the development environment.
+You can launch a development container with the following command:
 
 ```shell
-$ docker run -it -v ./core:/openipe/core openipe:latest /bin/bash
+docker compose run --remove-orphans openipe
+```
 
-```
-### Docker compose setup
-You can also use [Docker Compose](https://docs.docker.com/compose/) to set up the development environment.
-See the provided `docker-compose.yaml` file for an example configuration.
-You can start a new container with the following command:
+Check (and if desired, modify) the list of mounted directories in [`docker-compose.yaml`](./docker-compose.yaml), which will allow you to synchronize files between the container and your local file system.
+
+You can also build the image locally if you'd like to modify the [`Dockerfile`](./Dockerfile):
+
 ```shell
-$ docker compose up -d
-```
-You can then access the container's shell with:
-```shell
-$ docker exec -it openipe /bin/bash
+docker compose run --build --remove-orphans openipe_local
 ```
 
 ### Manual setup
+
 Alternatively, you can follow the steps in the [Dockerfile](Dockerfile) to set up the dependencies on your own machine.
 
 ## Basic functionality
 
-To enable easy reproduction of the most important results and to provide an easy way of getting started with the codebase, we provide top-level scripts in the `openipe` directory of the Docker image (and the root of this repository).
+To enable easy reproduction of the most important results and to provide an easy way of getting started with the codebase, we provide top-level scripts in the `scripts` directory.
 These scripts can be used as a starting point for running more advanced examples and are detailed in the following sections.
 
 ### Unit test suite
@@ -98,11 +90,6 @@ $ ./scripts/isolation_tests.sh
 ...
 ```
 
-### Software development framework workflow
-
-The example `./scripts/framework_hello.sh` demonstrates how to apply our mitigation framework to C projects and run them on openIPE.
-This script runs the framework on a simple hello world C IPE project then executes it in the simulator, obtaining some performance measurements.
-
 ### Attestation case study
 
 The script `./scripts/framework_attestation.sh` runs the framework on the attestation code adapted from VRASED and runs it on openIPE, reporting on the total number of cycles elapsed.
@@ -116,6 +103,94 @@ For example, you can run `./scripts/framework_hello.sh` first to generate the si
 The script `./scripts/symbolic_ipe.sh` performs the security validation if the binary contains a valid IPE region, while `./scripts/symbolic_firmware.sh` will validate the firmware code.
 
 The Pandora reports will be stored in the `logs/symbolic_ipe/` and `logs/symbolic_firmware/` directories, respectively. If you use docker compose or manually map the volumes, you will be able to access these logs on your host machine and open them in a browser.
+
+## Software development framework
+
+The [`framework/`](core/sim/rtl_sim/src-c/framework) directory provides a **source-to-source C compilation toolchain** that automates the boilerplate required to safely call in and out of the IPE-protected region. `compiler.py` and `linker.py` act as drop-in replacements for `msp430-elf-gcc` and are wired in via `Makefile.include`:
+
+```makefile
+CC = $(OPENIPE)/compiler.py
+LD = $(OPENIPE)/linker.py
+```
+
+### Annotations
+
+Annotate C code with macros from `libipe/ipe_support.h`:
+
+| Macro       | Purpose                                                   |
+|-------------|-----------------------------------------------------------|
+| `IPE_ENTRY` | Entry point callable from untrusted code (ecall)          |
+| `IPE_FUNC`  | Internal IPE function (not directly callable from outside)|
+| `IPE_VAR`   | Protected variable (placed in `.ipe_vars`)                |
+| `IPE_CONST` | Protected constant (placed in `.ipe_const`)               |
+
+One compilation unit must also include `DECLARE_IPE_STRUCT;` to emit the hardware initialization structure.
+
+### Toolchain flow
+
+```
+  annotated C sources    libraries (libgcc.a, ...)
+         │                       │
+         ▼                       │
+     compiler.py                 │
+ (src→src AST transform)         │
+         │                       │
+         ▼                       │
+    .o files                     │
+         │                       │
+         └──────────┬────────────┘
+                    ▼
+                linker.py
+          (generate stubs + link)
+                    │
+                    ▼
+             final ELF binary
+        ┌────────────────────────┐
+        │   IPE-protected region │  ← hardware boundary
+        ├────────────────────────┤
+        │   untrusted code/data  │
+        └────────────────────────┘
+```
+
+### Toolchain components
+
+**compiler.py** performs a source-to-source AST transformation (via pycparser) on each annotated file:
+- `IPE_ENTRY fn()` is split: the body moves to `fn_internal()` inside the IPE region; `fn()` becomes a generated ecall stub.
+- Calls from IPE code to untrusted functions are rewritten to `fn_stub()` (ocall trampolines).
+- Calls to compiler helper routines (`libgcc.a`) are intercepted at assembly level and rewritten to secure, intra-IPE variants.
+- Argument register usage (r12–r15) is encoded as a bitmap and embedded as weak ELF symbols (`__ipe_ecall_*`, `__ipe_ocall_*`) for the linker.
+
+**linker.py** reads those symbols across all object files, instantiates assembly templates to produce the entry-dispatch table and ocall stubs, and links everything with a custom linker script. Different versions of IPE entry stubs (e.g., with or without secure interrupt support) can be specified via a JSON config file.
+
+### Ecall/ocall flow
+
+The runtime stubs implement the ecall/ocall entry points in assembly, with register clearing to prevent leakage across the IPE boundary.
+
+```
+   main   untrusted stub             IPE "enclave"
+     |          |          ╔══════════════════════════════╗
+     │          │          ║  IPE stub         IPE app    ║
+     ├─ fn ────>│          ║     │                │       ║
+     │          ├─ ipe_entry ──>─┤                │       ║
+     │          │          ║     ├─ fn_internal ─>│       ║
+     │          │          ║     │                │ ...   ║
+     │          │          ║     │<─ ocall_cb_fn ─┤       ║
+     │          │<─ ocall_stub ──┤                │       ║
+     │<─ cb_fn ─┤          ║     │                │       ║
+ ... │          │          ║     │                │       ║
+     ├── ret ──>│          ║     │                │       ║
+     │          ├─ ipe_entry ──>─┤                │       ║
+     │          │          ║     ├─ ocall ret ───>│       ║
+     │          │          ║     │                │ ...   ║
+     │          │          ║     │<─── ecall ret ─┤       ║
+     │          │<─ ecall ret ───┤                │       ║
+     │<─ ret ───┤          ║                              ║
+     │          │          ╚══════════════════════════════╝
+```
+
+**Ecalls (untrusted->IPE)** route through the single hardware entry point `ipe_entry`, which initializes secure registers and stack, before dispatching to `fn_internal()`.
+
+**Ocalls (IPE->untrusted)** use a generated trampoline `ocall_cb_fn()` that lives _inside_ the IPE region: it saves and clears secret registers, calls the untrusted `cb_fn()`, and the untrusted return re-enters IPE via `ipe_entry` to restore trusted registers before resuming.
 
 ## Extending the codebase
 

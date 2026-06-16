@@ -1,0 +1,51 @@
+`define LONG_TIMEOUT
+
+initial
+   begin
+      $display(" ===============================================");
+      $display("|                 START SIMULATION              |");
+      $display(" ===============================================");
+      // Disable automatic DMA verification
+      #10;
+      dma_verif_on = 0;
+
+      repeat(5) @(posedge mclk);
+      stimulus_done = 0;
+
+      //---------------------------------------
+      // Generate stimulus
+      //---------------------------------------
+
+      $write("waiting for bootcode to finish..");
+      @(negedge dut.ipe_bootcode_exec);
+      $display("\t[OK]");
+      //repeat(100) @(posedge mclk) $display("%s", msp_debug_0.inst_full);
+
+      if (!dut.ipe.ipe_enabled)
+         tb_error("====== IPE not enabled ======");
+
+      $write("waiting for main function..     ");
+      @(r8==16'hDEAD);
+      $display("\t[OK]");
+      if(r7 !== 16'd56)
+         tb_error("Wrong unprotected multiplication computed");
+      
+      $write("waiting for IPE call..          ");
+      @(dut.ipe.ipe_executing);
+      $display("\t[OK]");
+
+      $write("waiting for IPE return..          ");
+      @(negedge dut.ipe.ipe_executing);
+      $display("\t[OK]");
+      if(r12 !== 16'd20)
+         tb_error("Wrong IPE multiplication computed");
+
+      repeat(20) @(posedge mclk);
+
+      stimulus_done = 1;
+      $display(" ===============================================");
+      $display("|               SIMULATION DONE                 |");
+      $display("|       (stopped through verilog stimulus)      |");
+      $display(" ===============================================");
+      $finish;
+   end

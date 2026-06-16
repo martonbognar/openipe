@@ -5,7 +5,7 @@
 ###############################################################################
 
 # Enable/Disable waveform dumping
-OMSP_NODUMP=1
+OMSP_NODUMP=0
 export OMSP_NODUMP
 
 # Choose GCC toolchain prefix ('msp430' for MSPGCC / 'msp430-elf' for GCC RedHat/TI)
@@ -31,11 +31,11 @@ export OMSP_SIMULATOR
 ###############################################################################
 #                            Parameter Check                                  #
 ###############################################################################
-EXPECTED_ARGS=1
+EXPECTED_ARGS=2
 if [ $# -ne $EXPECTED_ARGS ]; then
     echo "ERROR    : wrong number of arguments"
-    echo "USAGE    : run_c <test name>"
-    echo "Example  : run_c sandbox"
+    echo "USAGE    : run_c <test dir> <test name>"
+    echo "Example  : run_c ../src_c sandbox"
     echo ""
     echo "Available tests:"
     echo -ne "                 "
@@ -47,10 +47,8 @@ fi
 ###############################################################################
 #                     Check if the required files exist                       #
 ###############################################################################
-softdir=../src-c/$1;
-
-if [ ! -e $softdir ]; then
-    echo "ERROR: test directory doesn't exist: $softdir"
+if [ ! -e $1 ]; then
+    echo "ERROR: test directory doesn't exist: $1"
     echo ""
     echo "Available tests:"
     echo -ne "                 "
@@ -59,4 +57,4 @@ if [ ! -e $softdir ]; then
     exit 1
 fi
 
-../bin/msp430sim_c $1
+../bin/msp430sim_c $1 $2

@@ -1,0 +1,1 @@
+{"firmware": "bootcode-clean-irq", "entry_stub": "ipe-protected-clean-irq.s", "ipe_irq_fw": "1"}

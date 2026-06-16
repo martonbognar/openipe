@@ -1,4 +1,4 @@
-FROM ubuntu:22.04
+FROM ubuntu:26.04
 
 # Set to noninteractive mode
 ARG DEBIAN_FRONTEND=noninteractive
@@ -7,15 +7,25 @@ ARG DEBIAN_FRONTEND=noninteractive
 # Basic dependencies
 ################################################################################
 
-RUN apt-get update && apt-get install build-essential cmake iverilog tk binutils-msp430 gcc-msp430 msp430-libc msp430mcu expect-dev git python3 python3-pip python3-venv -y
-RUN python3 -m pip install pyelftools
+RUN apt-get update && apt-get install build-essential cmake iverilog tk expect-dev git python3 python3-pip python3-venv wget unzip verilator -y
+RUN apt install python3-pyelftools
 
+# Install toolchain
+COPY install-ti-gcc.sh .
+RUN ./install-ti-gcc.sh && rm install-ti-gcc.sh
+
+ENV PATH="$PATH:/msp430-gcc/bin"
+
+# Install 
 ################################################################################
 # Install dependencies for the software mitigation framework
 ################################################################################
 
+RUN python3 -m venv openipe_venv
 COPY core/sim/rtl_sim/src-c/framework/requirements.txt .
-RUN python3 -m pip install -r requirements.txt && rm requirements.txt
+RUN  ./openipe_venv/bin/pip install -r requirements.txt && rm requirements.txt
+ENV PATH="/openipe_venv/bin:$PATH"
+ENV PATH="$PATH:/openipe/core/sim/openipe-sim"
 
 ################################################################################
 # Install the Pandora tool
@@ -24,7 +34,9 @@ RUN python3 -m pip install -r requirements.txt && rm requirements.txt
 WORKDIR /pandora
 RUN git clone https://github.com/pandora-tee/pandora .
 RUN git clone https://github.com/angr/angr-platforms
-RUN python3 -m pip install -r requirements.txt && cd angr-platforms && python3 -m pip install .
+RUN python3 -m venv venv
+RUN ./venv/bin/pip install -r requirements.txt
+RUN cd angr-platforms && ../venv/bin/pip install .
 
 ################################################################################
 # Copy convenience scripts
