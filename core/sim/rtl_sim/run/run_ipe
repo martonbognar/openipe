@@ -101,9 +101,10 @@ mkdir -p $LOG_DIR
 
 # Running attacks without the hardware fixes (expected to succeed and thus cause violations)
 export __OMIT_IPE_FIXES=1
-export __OMIT_SP_SWITCHING=1
 ../bin/msp430sim ipe/ipe_sw_jump | tee $LOG_DIR/ipe_sw_jump.log
 ../bin/msp430sim ipe/attack_ccc | tee $LOG_DIR/attack_ccc.log
+unset __OMIT_IPE_FIXES
+export __OMIT_SP_SWITCHING=1
 ../bin/msp430sim ipe/attack_irq_exploit | tee $LOG_DIR/attack_irq_exploit.log
 
 # Report regression results

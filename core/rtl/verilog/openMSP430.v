@@ -272,6 +272,8 @@ wire                 bootcode_dbg_violation;
 wire                 ipe_eu_violation;
 `ifndef OMIT_IPE_FIXES
 wire                 ipe_fe_violation;
+`else
+wire                 ipe_fe_violation = 1'b0;
 `endif
 wire                 ipe_dma_violation;
 wire                 ipe_dbg_mem_violation;
