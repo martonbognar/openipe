@@ -25,6 +25,7 @@ RUN python3 -m venv openipe_venv
 COPY core/sim/rtl_sim/src-c/framework/requirements.txt .
 RUN  ./openipe_venv/bin/pip install -r requirements.txt && rm requirements.txt
 ENV PATH="/openipe_venv/bin:$PATH"
+ENV PATH="$PATH:/openipe/core/sim/openipe-sim"
 
 ################################################################################
 # Install the Pandora tool

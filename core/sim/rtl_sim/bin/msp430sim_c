@@ -139,7 +139,7 @@ base_dir=$PWD
 cd $softdir
 make clean
 
-cp $base_dir/../bin/ipe_c_linker.x pmem.x
+cp $base_dir/../bin/ipe_linker.x pmem.x
 PMEM_BASE=$((0x10000-$pmemsize))
 STACK_INIT=$((persize+0x0080))
 BMEM_BASE=$((persize+dmemsize))
