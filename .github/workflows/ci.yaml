@@ -37,6 +37,42 @@ jobs:
           path: /tmp/openipe-docker.tar
 
   ci-tests:
+    name: ${{ matrix.test }}${{ matrix.defines != '' && format(' ({0})', matrix.defines) || '' }}
+    runs-on: ubuntu-latest
+    needs: build-docker
+    strategy:
+      fail-fast: false
+      matrix:
+        test: [regression-tests, isolation-tests]
+        defines: ["", "OMIT_IPE_FIXES"]
+        include:
+          - test: regression-tests
+            cmd: cd /openipe/core/sim/rtl_sim/run/ && ./run_all
+          - test: isolation-tests
+            cmd: cd /openipe/core/sim/rtl_sim/run/ && ./run_ipe
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+        with:
+          submodules: true
+
+      - name: Download Docker artifact
+        uses: actions/download-artifact@v8
+        with:
+          name: openipe-docker
+          path: /tmp
+
+      - name: Load Docker image
+        run: docker load --input /tmp/openipe-docker.tar
+
+      - name: ${{ matrix.test }}${{ matrix.defines != '' && format(' ({0})', matrix.defines) || '' }}
+        uses: addnab/docker-run-action@v3
+        with:
+          image: openipe:latest
+          options: -v ${{ github.workspace }}/core:/openipe/core
+          run: ${{ matrix.defines != '' && format('export __{0}=1 && ', matrix.defines) || '' }}${{ matrix.cmd }}
+
+  symbolic-tests:
     name: ${{ matrix.name }}
     runs-on: ubuntu-latest
     needs: build-docker
@@ -44,10 +80,6 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - name: regression-tests
-            cmd: cd /openipe/core/sim/rtl_sim/run/ && ./run_all
-          - name: isolation-tests
-            cmd: cd /openipe/core/sim/rtl_sim/run/ && ./run_ipe
           - name: symbolic-ipe
             cmd: ./scripts/symbolic_ipe.sh
           - name: symbolic-firmware
@@ -134,7 +166,7 @@ jobs:
     name: Push Docker image
     runs-on: ubuntu-latest
     # only run when build and all tests succeed
-    needs: [build-docker, ci-tests, verilator-tests]
+    needs: [build-docker, ci-tests, symbolic-tests, verilator-tests]
     steps:
       - name: Download Docker artifact
         uses: actions/download-artifact@v8

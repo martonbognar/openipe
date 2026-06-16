@@ -42,6 +42,7 @@
 ../../../bench/verilog/ram.v
 ../../../bench/verilog/io_cell.v
 ../../../bench/verilog/msp_debug.v
+../../../bench/verilog/omsp_uart_print.v
 
 
 //=============================================================================
