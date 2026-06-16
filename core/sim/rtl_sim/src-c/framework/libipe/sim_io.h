@@ -20,7 +20,7 @@ static inline int puts(const char *s)
 }
 
 #define ASSERT(cond, msg) \
-    do { if (!(cond)) { puts("FAIL: " msg); EXIT(); } } while (0)
+    do { if (!(cond)) { puts("FAIL: " msg); EXIT(); } puts("ok:   " msg); } while (0)
 
 #define PASS() do { puts("PASS"); EXIT(); } while (0)
 

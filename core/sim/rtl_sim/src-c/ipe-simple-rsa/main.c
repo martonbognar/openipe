@@ -49,10 +49,10 @@ int main(void)
     WDTCTL = WDTPW | WDTHOLD; // Stop Watchdog
 
     result = rsa_encode(4);
-    ASSERT(result == 31, "rsa_encode returned wrong value");
+    ASSERT(result == 31, "rsa_encode(4) == 31");
 
     result = rsa_decode(result);
-    ASSERT(result == 4, "rsa_decode returned wrong value");
+    ASSERT(result == 4, "rsa_decode(31) == 4");
 
     PASS();
 }

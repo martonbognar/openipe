@@ -17,7 +17,7 @@ int main(void)
     WDTCTL = WDTPW | WDTHOLD;                 // Stop Watchdog
 
     attest();
-    ASSERT(mac_region[24] != 0, "HMAC result is zero");
+    ASSERT(mac_region[24] != 0, "mac_region[24] != 0");
 
     PASS();
 }

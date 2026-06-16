@@ -18,10 +18,10 @@ int main(void)
     WDTCTL = WDTPW | WDTHOLD; // Stop Watchdog
 
     result = unprotected_mul(7, 8);
-    ASSERT(result == 56, "unprotected_mul returned wrong value");
+    ASSERT(result == 56, "unprotected_mul(7,8) == 56");
 
     result = mul(4, 5);
-    ASSERT(result == 20, "IPE mul returned wrong value");
+    ASSERT(result == 20, "mul(4,5) == 20");
 
     PASS();
 }

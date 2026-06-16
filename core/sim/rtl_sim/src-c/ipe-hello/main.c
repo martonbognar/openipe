@@ -32,10 +32,10 @@ int main(void)
     WDTCTL = WDTPW | WDTHOLD; // Stop Watchdog
 
     rv = ipe_func(0xCD);
-    ASSERT((uint16_t)rv == 0xABCDu, "ipe_func returned wrong value");
+    ASSERT((uint16_t)rv == 0xABCDu, "ipe_func(0xCD) == 0xABCD");
 
     rv = ipe_func2(0);
-    ASSERT(rv == 2, "ipe_func2 returned wrong value");
+    ASSERT(rv == 2, "ipe_func2(0) == 2");
 
     PASS();
 }
