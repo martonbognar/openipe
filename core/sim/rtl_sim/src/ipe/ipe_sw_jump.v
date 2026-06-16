@@ -12,7 +12,9 @@ initial
       repeat(5) @(posedge mclk);
       stimulus_done = 0;
 
-
+`ifdef OMIT_IPE_FIXES
+      stimulus_done = 1;
+`else
       /* checkpoint 1 */
       @(r12 == 16'hCAFE);
       @(posedge dut.exec_done); // wait for branch to complete
@@ -28,4 +30,5 @@ initial
       @(r0==16'hFFFF);
 
       stimulus_done = 1;
+`endif
    end

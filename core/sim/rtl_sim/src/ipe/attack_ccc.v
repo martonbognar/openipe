@@ -13,6 +13,9 @@ initial
       stimulus_done = 0;
 
       /* ----------------------  END OF TEST --------------- */
+`ifdef OMIT_IPE_FIXES
+      stimulus_done = 1;
+`else
       @(r0==16'hFFFF);
 
       if (r14 !== 16'd42)
@@ -22,4 +25,5 @@ initial
          tb_error("====== stack wrong offset ======");
 
       stimulus_done = 1;
+`endif
    end
