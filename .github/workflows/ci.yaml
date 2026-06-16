@@ -51,6 +51,9 @@ jobs:
           - test: isolation-tests
             cmd: cd /openipe/core/sim/rtl_sim/run/ && ./run_ipe
     steps:
+      - uses: actions/checkout@v6
+        with:
+          submodules: true
       - uses: ./.github/actions/setup
 
       - name: ${{ matrix.test }}${{ matrix.defines != '' && format(' ({0})', matrix.defines) || '' }}
@@ -73,6 +76,9 @@ jobs:
           - name: symbolic-firmware
             cmd: ./scripts/symbolic_firmware.sh
     steps:
+      - uses: actions/checkout@v6
+        with:
+          submodules: true
       - uses: ./.github/actions/setup
 
       - name: ${{ matrix.name }}
@@ -107,6 +113,9 @@ jobs:
       fail-fast: false
       matrix: ${{ fromJSON(needs.generate-verilator-matrix.outputs.matrix) }}
     steps:
+      - uses: actions/checkout@v6
+        with:
+          submodules: true
       - uses: ./.github/actions/setup
 
       - name: Simulate ${{ matrix.program }}
