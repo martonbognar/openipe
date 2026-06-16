@@ -51,19 +51,7 @@ jobs:
           - test: isolation-tests
             cmd: cd /openipe/core/sim/rtl_sim/run/ && ./run_ipe
     steps:
-      - name: Check out repository
-        uses: actions/checkout@v6
-        with:
-          submodules: true
-
-      - name: Download Docker artifact
-        uses: actions/download-artifact@v8
-        with:
-          name: openipe-docker
-          path: /tmp
-
-      - name: Load Docker image
-        run: docker load --input /tmp/openipe-docker.tar
+      - uses: ./.github/actions/setup
 
       - name: ${{ matrix.test }}${{ matrix.defines != '' && format(' ({0})', matrix.defines) || '' }}
         uses: addnab/docker-run-action@v3
@@ -85,19 +73,7 @@ jobs:
           - name: symbolic-firmware
             cmd: ./scripts/symbolic_firmware.sh
     steps:
-      - name: Check out repository
-        uses: actions/checkout@v6
-        with:
-          submodules: true
-
-      - name: Download Docker artifact
-        uses: actions/download-artifact@v8
-        with:
-          name: openipe-docker
-          path: /tmp
-
-      - name: Load Docker image
-        run: docker load --input /tmp/openipe-docker.tar
+      - uses: ./.github/actions/setup
 
       - name: ${{ matrix.name }}
         uses: addnab/docker-run-action@v3
@@ -131,19 +107,7 @@ jobs:
       fail-fast: false
       matrix: ${{ fromJSON(needs.generate-verilator-matrix.outputs.matrix) }}
     steps:
-      - name: Check out repository
-        uses: actions/checkout@v6
-        with:
-          submodules: true
-
-      - name: Download Docker artifact
-        uses: actions/download-artifact@v8
-        with:
-          name: openipe-docker
-          path: /tmp
-
-      - name: Load Docker image
-        run: docker load --input /tmp/openipe-docker.tar
+      - uses: ./.github/actions/setup
 
       - name: Simulate ${{ matrix.program }}
         uses: addnab/docker-run-action@v3

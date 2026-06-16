@@ -1,0 +1,20 @@
+name: Setup
+description: Check out repository (with submodules) and load Docker image artifact
+
+runs:
+  using: composite
+  steps:
+    - name: Check out repository
+      uses: actions/checkout@v6
+      with:
+        submodules: true
+
+    - name: Download Docker artifact
+      uses: actions/download-artifact@v8
+      with:
+        name: openipe-docker
+        path: /tmp
+
+    - name: Load Docker image
+      shell: bash
+      run: docker load --input /tmp/openipe-docker.tar
