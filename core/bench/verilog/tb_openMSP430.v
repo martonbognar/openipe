@@ -41,12 +41,40 @@
 `include "openMSP430_defines.v"
 `endif
 
+`ifndef VERILATOR
 module  tb_openMSP430;
+`else
+module  tb_openMSP430 (
+    input  wire                   dco_clk,
+    input  wire                   reset_n,
+
+    output wire [`PMEM_MSB:0]     pmem_addr,
+    output wire                   pmem_cen,
+    output wire             [1:0] pmem_wen,
+    output wire            [15:0] pmem_din,
+    input  wire            [15:0] pmem_dout,
+
+    output wire [`BMEM_MSB:0]     bmem_addr,
+    output wire                   bmem_cen,
+    output wire             [1:0] bmem_wen,
+    output wire            [15:0] bmem_din,
+    input  wire            [15:0] bmem_dout,
+
+    output wire [`DMEM_MSB:0]     dmem_addr,
+    output wire                   dmem_cen,
+    output wire             [1:0] dmem_wen,
+    output wire            [15:0] dmem_din,
+    input  wire            [15:0] dmem_dout,
+
+    output wire                   cpuoff
+);
+`endif /* VERILATOR */
 
 //
 // Wire & Register definition
 //------------------------------
 
+`ifndef VERILATOR
 // Data Memory interface
 wire [`DMEM_MSB:0] dmem_addr;
 wire               dmem_cen;
@@ -67,6 +95,7 @@ wire               pmem_cen;
 wire        [15:0] pmem_din;
 wire         [1:0] pmem_wen;
 wire        [15:0] pmem_dout;
+`endif /* VERILATOR */
 
 // Peripherals interface
 wire        [13:0] per_addr;
@@ -139,7 +168,9 @@ wire               ta_out2;
 wire               ta_out2_en;
 
 // Clock / Reset & Interrupts
+`ifndef VERILATOR
 reg                dco_clk;
+`endif /* VERILATOR */
 wire               dco_enable;
 wire               dco_wkup;
 reg                dco_local_enable;
@@ -152,7 +183,10 @@ wire               aclk;
 wire               aclk_en;
 wire               smclk;
 wire               smclk_en;
+`ifndef VERILATOR
 reg                reset_n;
+wire               cpuoff;
+`endif /* VERILATOR */
 wire               puc_rst;
 reg                nmi;
 reg  [`IRQ_NR-3:0] irq;
@@ -199,6 +233,7 @@ wire               dbg_sda_master_in;
 reg         [15:0] dbg_i2c_buf;
 reg     [8*32-1:0] dbg_i2c_string;
 
+`ifndef VERILATOR
 // Core testbench debuging signals
 wire    [8*32-1:0] i_state;
 wire    [8*32-1:0] e_state;
@@ -207,6 +242,7 @@ wire    [8*32-1:0] inst_full;
 wire        [31:0] inst_number;
 wire        [15:0] inst_pc;
 wire    [8*32-1:0] inst_short;
+`endif /* VERILATOR */
 
 // Testbench variables
 integer            tb_idx;
@@ -221,6 +257,7 @@ reg [63:0] time_clk;
 // Include files
 //------------------------------
 
+`ifndef VERILATOR
 // CPU & Memory registers
 `include "registers.v"
 
@@ -244,7 +281,15 @@ reg [63:0] time_clk;
 // Verilog stimulus
 `include "stimulus.v"
 
+`else /* VERILATOR */
+// Debug interface: tie off I2C address/UART; these come from dbg_i2c_tasks.v in Icarus mode
+localparam I2C_ADDR      = 7'h45;
+localparam I2C_BROADCAST = 7'h67;
+assign dbg_uart_rxd = 1'b1;
+`endif /* VERILATOR */
 
+
+`ifndef VERILATOR
 //
 // Initialize Memory
 //------------------------------
@@ -265,8 +310,10 @@ initial
        $finish;
      end
   end
+`endif /* VERILATOR */
 
 
+`ifndef VERILATOR
 //
 // Generate Clock & Reset
 //------------------------------
@@ -358,11 +405,48 @@ initial
      scan_mode               = 1'b0;
   end
 
+`else /* VERILATOR */
+// In Verilator mode dco_clk/reset_n are driven by the C++ harness;
+// initialize everything else to safe defaults here.
+initial
+  begin
+     lfxt_clk     = 1'b0;
+     cpu_en       = 1'b1;
+     dbg_en       = 1'b0;
+     irq          = {`IRQ_NR-2{1'b0}};
+     nmi          = 1'b0;
+     wkup         = 14'h0000;
+     dma_addr     = 15'h0000;
+     dma_din      = 16'h0000;
+     dma_en       = 1'b0;
+     dma_priority = 1'b0;
+     dma_we       = 2'b00;
+     dma_wkup     = 1'b0;
+     p1_din       = 8'h00;
+     p2_din       = 8'h00;
+     p3_din       = 8'h00;
+     p4_din       = 8'h00;
+     p5_din       = 8'h00;
+     p6_din       = 8'h00;
+     inclk        = 1'b0;
+     taclk        = 1'b0;
+     ta_cci0a     = 1'b0;
+     ta_cci0b     = 1'b0;
+     ta_cci1a     = 1'b0;
+     ta_cci1b     = 1'b0;
+     ta_cci2a     = 1'b0;
+     ta_cci2b     = 1'b0;
+     scan_enable  = 1'b0;
+     scan_mode    = 1'b0;
+  end
+`endif /* VERILATOR */
+
 always @(posedge mclk) begin
   if (puc_rst) time_clk <= 0;
   else   time_clk <= time_clk + 1;
 end
 
+`ifndef VERILATOR
 //
 // Program Memory
 //----------------------------------
@@ -413,6 +497,7 @@ ram #(`DMEM_MSB, `DMEM_SIZE) dmem_0 (
     .ram_din           (dmem_din),             // Data Memory data input
     .ram_wen           (dmem_wen)              // Data Memory write enable (low active)
 );
+`endif /* VERILATOR */
 
 
 //
@@ -452,6 +537,7 @@ openMSP430 dut (
     .bmem_cen          (bmem_cen),             // Bootcode Memory chip enable (low active)
     .bmem_din          (bmem_din),             // Bootcode Memory data input (optional)
     .bmem_wen          (bmem_wen),             // Bootcode Memory write byte enable (low active) (optional)
+    .cpuoff            (cpuoff),               // CPU off (used by Verilator harness to detect simulation end)
     .puc_rst           (puc_rst),              // Main system reset
     .smclk             (smclk),                // ASIC ONLY: SMCLK
     .smclk_en          (smclk_en),             // FPGA ONLY: SMCLK enable
@@ -661,6 +747,7 @@ assign wkup_in = wkup | {1'b0,                 // Vector 13  (0xFFFA)
                          1'b0};                // Vector  0  (0xFFE0)
 
 
+`ifndef VERILATOR
 //
 // I2C serial debug interface
 //----------------------------------
@@ -701,8 +788,13 @@ io_cell sda_master_inst (
     .data_out_en       (!dbg_sda_master_out),  // Output enable
     .data_out          (1'b0)                  // Output
 );
+`else /* VERILATOR */
+assign dbg_scl_slave    = 1'b1;
+assign dbg_sda_slave_in = 1'b1;
+`endif /* VERILATOR */
 
 
+`ifndef VERILATOR
 //
 // Debug utility signals
 //----------------------------------------
@@ -721,7 +813,9 @@ msp_debug msp_debug_0 (
     .mclk              (mclk),                 // Main system clock
     .puc_rst           (puc_rst)               // Main system reset
 );
+`endif /* VERILATOR */
 
+`ifndef VERILATOR
 //
 // Generate Waveform
 //----------------------------------------
@@ -846,5 +940,7 @@ initial // Normal end of test
          $finish;
       end
    endtask
+
+`endif /* VERILATOR */
 
 endmodule

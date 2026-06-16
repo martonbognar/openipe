@@ -2,7 +2,7 @@ RTL_DIR     = ../../rtl/verilog
 BENCH_DIR   = ../../bench/verilog
 RTL_SIM_DIR = ../rtl_sim
 
-TOPLEVEL  = sim_top
+TOPLEVEL  = tb_openMSP430
 EXE_NAME  = ipe-sim
 
 ifndef BUILD_DIR
@@ -45,13 +45,13 @@ all: $(EXE_FILE) $(BOOTCODE_ELF)
 $(EXE_FILE): $(VERILATOR_HDR) $(DEPS)
 	$(MAKE) -C $(BUILD_DIR) -f V$(TOPLEVEL).mk $(EXE_NAME)
 
-$(VERILATOR_HDR): $(TOPLEVEL).v $(RTL_DIR)/openMSP430_defines.v FORCE
+$(VERILATOR_HDR): $(BENCH_DIR)/$(TOPLEVEL).v $(RTL_DIR)/openMSP430_defines.v FORCE
 	verilator --cc --exe --trace -O3 \
 	    -CFLAGS "$(CFLAGS)" \
 	    $(VERILATOR_WARNS) \
 	    -Mdir $(BUILD_DIR) \
 	    $(VERILOG_INCLUDES) \
-	    $(TOPLEVEL).v \
+	    $(BENCH_DIR)/$(TOPLEVEL).v \
 	    $(DEPS) \
 	    -o $(EXE_NAME)
 

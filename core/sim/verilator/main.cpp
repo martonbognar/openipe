@@ -1,4 +1,4 @@
-#include "Vsim_top.h"
+#include "Vtb_openMSP430.h"
 #include <verilated.h>
 #include <verilated_vcd_c.h>
 
@@ -157,7 +157,7 @@ static std::string objcopy_to_ihex(const std::string& elf)
     return ihex;
 }
 
-static std::unique_ptr<Vsim_top> top_g;
+static std::unique_ptr<Vtb_openMSP430> top_g;
 static void sig_handler(int)
 {
     top_g.reset();
@@ -267,7 +267,7 @@ int main(int argc, char** argv)
 
     // ── Verilator init ────────────────────────────────────────────────
     Verilated::commandArgs(argc, argv);
-    top_g = std::unique_ptr<Vsim_top>{new Vsim_top};
+    top_g = std::unique_ptr<Vtb_openMSP430>{new Vtb_openMSP430};
     auto& top = *top_g;
 
     top.reset_n   = 1;
