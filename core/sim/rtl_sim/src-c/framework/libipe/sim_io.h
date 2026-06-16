@@ -12,10 +12,11 @@ static inline int putchar(int c)
     return c;
 }
 
-static inline void puts(const char *s)
+static inline int puts(const char *s)
 {
     while (*s) putchar(*s++);
     putchar('\n');
+    return 0;
 }
 
 #define ASSERT(cond, msg) \
