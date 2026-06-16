@@ -51,29 +51,34 @@ Alternatively, you can follow the steps in the [Dockerfile](Dockerfile) to set u
 
 ## Basic functionality
 
-To enable easy reproduction of the most important results and to provide an easy way of getting started with the codebase, we provide top-level scripts in the `scripts` directory.
-These scripts can be used as a starting point for running more advanced examples and are detailed in the following sections.
+The following sections describe how to run the most important experiments.
+All commands are meant to be run inside the container (e.g. via `docker compose run openipe`).
 
 ### Unit test suite
 
 #### Regression tests
 
-Run `./scripts/regression_tests.sh` to execute the original regression tests of openMSP430.
-This test will finish with an overview table and a report of the number of successful and unsuccessful tests.
+Run the original regression tests of openMSP430:
+
+```shell
+cd /openipe/core/sim/rtl_sim/run/ && ./run_all
+```
+
+This will finish with an overview table and a report of the number of successful and unsuccessful tests.
 
 #### Isolation test suite
 
-Run `./scripts/isolation_tests.sh` to execute the unit tests we added to validate the security guarantees added by our extensions and the interrupt case study.
-This script performs two steps:
-First, it runs the tests as expected, where it is validated that no leakage occurs.
-Then, it runs some tests without the hardware fixes proposed in IPE Exposure to validate that this re-enables some vulnerabilities.
+Run the unit tests that validate the security guarantees added by our extensions and the interrupt case study:
+
+```shell
+cd /openipe/core/sim/rtl_sim/run/ && ./run_ipe
+```
+
+This performs two steps: first it runs the tests as expected (no leakage), then it runs some tests without the hardware fixes proposed in IPE Exposure to validate that this re-enables some vulnerabilities.
 
 During the execution of the case study tests (#24-26), overhead measurements for the interrupt latencies are also provided.
 
-
 ```shell
-$ ./scripts/isolation_tests.sh
-...
 #===================================================================#
 #                            SUMMARY REPORT                         #
 #===================================================================#
@@ -86,23 +91,38 @@ $ ./scripts/isolation_tests.sh
          |----------------------------------
          | Number of tests         : 26
          +----------------------------------
-
-...
 ```
 
 ### Attestation case study
 
-The script `./scripts/framework_attestation.sh` runs the framework on the attestation code adapted from VRASED and runs it on openIPE, reporting on the total number of cycles elapsed.
+Run the framework on the attestation code adapted from VRASED, reporting on the total number of cycles elapsed:
+
+```shell
+cd /openipe/core/sim/rtl_sim/run/ && ./run_c ipe-hmac
+```
 
 ### Symbolic validation
 
-The following scripts run the [Pandora](https://github.com/pandora-tee/pandora) symbolic execution tool on openIPE binaries.
-These scripts operate on the `pmem.elf` and `bmem.elf` binaries located in the `core/sim/rtl_sim/run` directory, i.e., they will analyze the last program that was run on the simulator.
-For example, you can run `./scripts/framework_hello.sh` first to generate the simple hello world IPE application binary.
+The [Pandora](https://github.com/pandora-tee/pandora) symbolic execution tool can be run on openIPE binaries.
+It operates on compiled ELF binaries.
+For example, first build the hello world IPE application and the bootcode:
 
-The script `./scripts/symbolic_ipe.sh` performs the security validation if the binary contains a valid IPE region, while `./scripts/symbolic_firmware.sh` will validate the firmware code.
+```shell
+make -C /openipe/core/sim/rtl_sim/src-c/ipe-hello
+make -C /openipe/core/sim/verilator build/bootcode.elf
+```
 
-The Pandora reports will be stored in the `logs/symbolic_ipe/` and `logs/symbolic_firmware/` directories, respectively. If you use docker compose or manually map the volumes, you will be able to access these logs on your host machine and open them in a browser.
+Then run Pandora to validate the IPE application binary, or the firmware:
+
+```shell
+cd /pandora && source ./venv/bin/activate
+# validate IPE application:
+./pandora.py run -c config-debugging.ini /openipe/core/sim/rtl_sim/src-c/ipe-hello/ipe-hello.elf
+# validate firmware:
+./pandora.py run -c config-debugging.ini /openipe/core/sim/verilator/build/bootcode.elf
+```
+
+The Pandora reports will be stored in `/pandora/logs/debugging_logs/`. If you use docker compose or manually map the volumes, you will be able to access these logs on your host machine and open them in a browser.
 
 ## Software development framework
 

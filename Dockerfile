@@ -38,7 +38,7 @@ RUN ./venv/bin/pip install -r requirements.txt
 RUN cd angr-platforms && ../venv/bin/pip install .
 
 ################################################################################
-# Copy convenience scripts
+# Copy scripts
 ################################################################################
 
 WORKDIR /openipe

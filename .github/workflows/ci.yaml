@@ -37,13 +37,21 @@ jobs:
           path: /tmp/openipe-docker.tar
 
   ci-tests:
-    name: ${{ matrix.test-script }}
+    name: ${{ matrix.name }}
     runs-on: ubuntu-latest
     needs: build-docker
     strategy:
       fail-fast: false
       matrix:
-        test-script: ["./scripts/regression_tests.sh", "./scripts/isolation_tests.sh", "./scripts/framework_hello.sh", "./scripts/framework_mul.sh", "./scripts/framework_rsa.sh", "./scripts/framework_attestation.sh", "./scripts/framework_hello.sh ; ./scripts/symbolic_ipe.sh", "./scripts/framework_hello.sh ; ./scripts/symbolic_firmware.sh", "./scripts/verilator_sim_tests.sh"]
+        include:
+          - name: regression-tests
+            cmd: cd /openipe/core/sim/rtl_sim/run/ && ./run_all
+          - name: isolation-tests
+            cmd: cd /openipe/core/sim/rtl_sim/run/ && ./run_ipe
+          - name: symbolic-ipe
+            cmd: ./scripts/symbolic_ipe.sh
+          - name: symbolic-firmware
+            cmd: ./scripts/symbolic_firmware.sh
     steps:
       - name: Check out repository
         uses: actions/checkout@v6
@@ -59,18 +67,74 @@ jobs:
       - name: Load Docker image
         run: docker load --input /tmp/openipe-docker.tar
 
-      - name: Run ${{ matrix.test-script }}
+      - name: ${{ matrix.name }}
         uses: addnab/docker-run-action@v3
         with:
           image: openipe:latest
           options: -v ${{ github.workspace }}/core:/openipe/core
-          run: ${{ matrix.test-script }}
+          run: ${{ matrix.cmd }}
+
+  generate-verilator-matrix:
+    name: Generate Verilator test matrix
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.set-matrix.outputs.matrix }}
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+
+      - name: Discover ipe-* programs
+        id: set-matrix
+        run: |
+          programs=$(ls -d core/sim/rtl_sim/src-c/ipe-*/ 2>/dev/null \
+            | xargs -n1 basename \
+            | jq -R . | jq -cs .)
+          echo "matrix={\"program\":$programs}" >> "$GITHUB_OUTPUT"
+
+  verilator-tests:
+    name: verilator/${{ matrix.program }}
+    runs-on: ubuntu-latest
+    needs: [build-docker, generate-verilator-matrix]
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.generate-verilator-matrix.outputs.matrix) }}
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+        with:
+          submodules: true
+
+      - name: Download Docker artifact
+        uses: actions/download-artifact@v8
+        with:
+          name: openipe-docker
+          path: /tmp
+
+      - name: Load Docker image
+        run: docker load --input /tmp/openipe-docker.tar
+
+      - name: Simulate ${{ matrix.program }}
+        uses: addnab/docker-run-action@v3
+        with:
+          image: openipe:latest
+          options: -v ${{ github.workspace }}/core:/openipe/core
+          run: |
+            set -e
+            SIM_DIR=/openipe/core/sim/verilator
+            SRC_C=/openipe/core/sim/rtl_sim/src-c
+            PROG=${{ matrix.program }}
+            make -C "$SIM_DIR"
+            (cd "$SRC_C/$PROG" && make clean && make)
+            output=$("$SIM_DIR/build/ipe-sim" --firmware "$SIM_DIR/build/bootcode.elf" "$SRC_C/$PROG/$PROG.elf" 2>&1)
+            ret=$?
+            echo "$output"
+            if [ "$ret" -ne 0 ] || echo "$output" | grep -q "^FAIL"; then exit 1; fi
 
   push-image:
     name: Push Docker image
     runs-on: ubuntu-latest
-    # only run when build and ci-tests both succeed
-    needs: [build-docker, ci-tests]
+    # only run when build and all tests succeed
+    needs: [build-docker, ci-tests, verilator-tests]
     steps:
       - name: Download Docker artifact
         uses: actions/download-artifact@v8
@@ -101,5 +165,5 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@v6
 
-      - name: Run a simple tests inside the container
-        run: docker compose run openipe ./scripts/framework_hello.sh
+      - name: Run a simple test inside the container
+        run: docker compose run openipe bash -c "cd /openipe/core/sim/rtl_sim/run/ && ./run_c ipe-hello"

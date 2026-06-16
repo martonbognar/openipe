@@ -1,5 +1,6 @@
 #include <msp430.h>
 #include "libipe/ipe_support.h"
+#include "libipe/sim_io.h"
 
 DECLARE_IPE_STRUCT;
 
@@ -47,18 +48,12 @@ int main(void)
     uint16_t result = 2;
     WDTCTL = WDTPW | WDTHOLD; // Stop Watchdog
 
-    asm __volatile__("mov %0, r8" ::"r"(0xdead) : "r8");
-
     result = rsa_encode(4);
+    ASSERT(result == 31, "rsa_encode returned wrong value");
 
-    asm __volatile__("mov %0, r7" :: "r"(result) : "r7"); 
-    asm __volatile__("mov %0, r8" ::"r"(0xbeef) : "r8");
-    
     result = rsa_decode(result);
+    ASSERT(result == 4, "rsa_decode returned wrong value");
 
-    asm __volatile__("mov %0, r7" :: "r"(result) : "r7"); 
-    asm __volatile__("mov %0, r8" ::"r"(0xcaca) : "r8"); 
-    
-    EXIT();
+    PASS();
 }
 

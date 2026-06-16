@@ -1,5 +1,6 @@
 #include <msp430.h>
 #include "libipe/ipe_support.h"
+#include "libipe/sim_io.h"
 
 int ipe_dummy2_outside(int x)
 {
@@ -29,17 +30,12 @@ int main(void)
 {
     int rv;
     WDTCTL = WDTPW | WDTHOLD; // Stop Watchdog
-    asm("mov %0, r8" ::"r"(0xdead) : "r8");
-
-    asm("mov %0, r8" ::"m"(c) : "r8");
 
     rv = ipe_func(0xCD);
-    asm("mov %0, r8" ::"r"(rv) : "r8");
-    asm("mov %0, r9" ::"r"(0xcaca) : "r9");
+    ASSERT((uint16_t)rv == 0xABCDu, "ipe_func returned wrong value");
 
     rv = ipe_func2(0);
-    asm("mov %0, r8" ::"r"(rv) : "r8");
-    asm("mov %0, r9" ::"r"(0xcacb) : "r9");
+    ASSERT(rv == 2, "ipe_func2 returned wrong value");
 
-    EXIT();
+    PASS();
 }

@@ -148,6 +148,9 @@ reg          [7:0] p6_din;
 wire        [15:0] per_dout_temp_8b;
 wire        [15:0] per_dout_temp_16b;
 
+// UART print peripheral
+wire        [15:0] per_dout_uart_print;
+
 // Timer A
 wire               irq_ta0;
 wire               irq_ta1;
@@ -703,13 +706,33 @@ template_periph_16b #(.BASE_ADDR((15'd`PER_SIZE-15'h0070) & 15'h7ff8)) template_
 
 
 //
+// UART print peripheral (outputs chars via $write — works in both Icarus and Verilator)
+//----------------------------------
+
+omsp_uart_print uart_print_0 (
+
+// OUTPUTs
+    .per_dout          (per_dout_uart_print),   // Peripheral data output
+
+// INPUTs
+    .mclk              (mclk),                 // Main system clock
+    .per_addr          (per_addr),             // Peripheral address
+    .per_din           (per_din),              // Peripheral data input
+    .per_en            (per_en),               // Peripheral enable (high active)
+    .per_we            (per_we),               // Peripheral write enable (high active)
+    .puc_rst           (puc_rst)               // Main system reset
+);
+
+
+//
 // Combine peripheral data bus
 //----------------------------------
 
 assign per_dout = per_dout_dio       |
                   per_dout_timerA    |
                   per_dout_temp_8b   |
-                  per_dout_temp_16b;
+                  per_dout_temp_16b  |
+                  per_dout_uart_print;
 
 
 //

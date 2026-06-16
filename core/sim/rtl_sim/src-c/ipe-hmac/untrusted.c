@@ -1,6 +1,7 @@
 #include <msp430.h>
 
 #include "libipe/ipe_support.h"
+#include "libipe/sim_io.h"
 
 
 int IPE_ENTRY attest(void);
@@ -15,9 +16,8 @@ int main(void)
 {
     WDTCTL = WDTPW | WDTHOLD;                 // Stop Watchdog
 
-    asm("mov %0, r8"::"r"(0xdead) :"r8");
     attest();
-    asm("mov %0, r8"::"m"(mac_region[24]) :"r8");
+    ASSERT(mac_region[24] != 0, "HMAC result is zero");
 
-    EXIT();
+    PASS();
 }
