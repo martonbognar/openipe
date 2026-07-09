@@ -46,7 +46,7 @@ $(EXE_FILE): $(VERILATOR_HDR) $(DEPS)
 	$(MAKE) -C $(BUILD_DIR) -f V$(TOPLEVEL).mk $(EXE_NAME)
 
 $(VERILATOR_HDR): $(BENCH_DIR)/$(TOPLEVEL).v $(RTL_DIR)/openMSP430_defines.v FORCE
-	verilator --cc --exe --trace -O3 \
+	verilator --cc --exe -O3 \
 	    -CFLAGS "$(CFLAGS)" \
 	    $(VERILATOR_WARNS) \
 	    -Mdir $(BUILD_DIR) \

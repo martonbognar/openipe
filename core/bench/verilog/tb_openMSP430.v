@@ -66,7 +66,15 @@ module  tb_openMSP430 (
     output wire            [15:0] dmem_din,
     input  wire            [15:0] dmem_dout,
 
-    output wire                   cpuoff
+    output wire                   cpuoff,
+
+    // Minimal instruction-trace signals (see custom VCD writer in main.cpp).
+    // These let the C++ harness log just enough to reconstruct successive
+    // instruction lengths and whether each instruction ran in IPE mode.
+    output wire            [15:0] trace_pc,            // PC of the decoded instruction
+    output wire                   trace_decode,        // pulses when a new instruction is decoded
+    output wire                   trace_exec_done,     // pulses when execution completes
+    output wire                   trace_ipe_executing  // high while executing inside the IPE
 );
 `endif /* VERILATOR */
 
@@ -836,6 +844,18 @@ msp_debug msp_debug_0 (
     .mclk              (mclk),                 // Main system clock
     .puc_rst           (puc_rst)               // Main system reset
 );
+`endif /* VERILATOR */
+
+`ifdef VERILATOR
+//
+// Minimal instruction-trace taps (Verilator only)
+//----------------------------------------
+// Cross-module references into the core, mirroring the signals msp_debug.v
+// uses in Icarus mode. The C++ harness samples only these into a compact VCD.
+assign trace_pc            = dut.frontend_0.pc;
+assign trace_decode        = dut.frontend_0.decode;
+assign trace_exec_done     = dut.frontend_0.exec_done;
+assign trace_ipe_executing = dut.ipe_executing;
 `endif /* VERILATOR */
 
 `ifndef VERILATOR

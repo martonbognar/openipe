@@ -1,6 +1,5 @@
 #include "Vtb_openMSP430.h"
 #include <verilated.h>
-#include <verilated_vcd_c.h>
 
 #include <memory>
 #include <vector>
@@ -32,8 +31,81 @@ static uint64_t mainTime;
 
 enum exit_codes { status_success, status_error, status_timeout, status_no_input };
 
-static bool tracer_enabled = false;
-static VerilatedVcdC* tracer_g = nullptr;
+// ─── Minimal instruction trace ────────────────────────────────────────────────
+//
+// A full Verilator VCD of this design dumps the entire signal hierarchy every
+// cycle, producing multi-GB files. For extracting instruction lengths we only
+// need a handful of taps (see tb_openMSP430.v): the decoded PC, an
+// instruction-boundary pulse, and whether the core is executing inside the IPE.
+// This writer emits a tiny VCD holding just those signals, sampled once per
+// CPU cycle. The VCD time axis is the cycle counter itself, so the length of an
+// instruction (in cycles) is simply the gap between successive `decode` pulses.
+class TraceVcd {
+public:
+    bool open(const char* path)
+    {
+        _f = std::fopen(path, "w");
+        if (!_f) return false;
+        std::fprintf(_f,
+            "$comment\n"
+            "  openIPE minimal instruction trace.\n"
+            "  One VCD time unit = one CPU clock cycle.\n"
+            "  Instruction length (cycles) = gap between successive 'decode' pulses.\n"
+            "  'ipe_executing' marks instructions running inside the IPE.\n"
+            "$end\n"
+            "$timescale 1 ns $end\n"
+            "$scope module tb_openMSP430 $end\n"
+            "$var wire 16 p pc [15:0] $end\n"
+            "$var wire  1 d decode $end\n"
+            "$var wire  1 e exec_done $end\n"
+            "$var wire  1 i ipe_executing $end\n"
+            "$upscope $end\n"
+            "$enddefinitions $end\n");
+        return true;
+    }
+
+    void sample(uint64_t cycle, uint16_t pc, bool decode, bool exec_done, bool ipe)
+    {
+        bool first = !_have_prev;
+        if (!first && pc == _pc && decode == _decode &&
+            exec_done == _exec_done && ipe == _ipe)
+            return;  // nothing changed → keep the VCD sparse
+
+        std::fprintf(_f, "#%llu\n", (unsigned long long)cycle);
+        if (first || pc  != _pc)        emit_vec(pc, 'p');
+        if (first || decode != _decode) std::fprintf(_f, "%dd\n", decode);
+        if (first || exec_done != _exec_done) std::fprintf(_f, "%de\n", exec_done);
+        if (first || ipe != _ipe)       std::fprintf(_f, "%di\n", ipe);
+
+        _pc = pc; _decode = decode; _exec_done = exec_done; _ipe = ipe;
+        _have_prev = true;
+    }
+
+    void close()
+    {
+        if (_f) { std::fclose(_f); _f = nullptr; }
+    }
+
+private:
+    void emit_vec(uint16_t v, char id)
+    {
+        char bits[17];
+        for (int i = 0; i < 16; i++)
+            bits[i] = (v & (0x8000u >> i)) ? '1' : '0';
+        bits[16] = '\0';
+        const char* p = bits;
+        while (p[1] && *p == '0') p++;  // trim leading zeros, keep ≥1 digit
+        std::fprintf(_f, "b%s %c\n", p, id);
+    }
+
+    std::FILE* _f = nullptr;
+    bool       _have_prev = false;
+    uint16_t   _pc = 0;
+    bool       _decode = false, _exec_done = false, _ipe = false;
+};
+
+static bool     tracer_enabled = false;
+static TraceVcd tracer_g;
 
 // ─── IHEX parser ────────────────────────────────────────────────────────────
 
@@ -161,7 +233,7 @@ static std::unique_ptr<Vtb_openMSP430> top_g;
 static void sig_handler(int)
 {
     top_g.reset();
-    if (tracer_g) { tracer_g->close(); delete tracer_g; tracer_g = nullptr; }
+    tracer_g.close();
     exit(status_error);
 }
 
@@ -174,7 +246,8 @@ static void print_usage(const char* prog)
         "\n"
         "Options:\n"
         "  --firmware FILE    IPE bootcode ELF loaded into bmem (required)\n"
-        "  -d, --dump FILE    Write VCD waveform to FILE\n"
+        "  -d, --dump FILE    Write a minimal instruction-length VCD to FILE\n"
+        "                     (pc, decode, exec_done, ipe_executing; time unit = cycle)\n"
         "  --dump-start N     Start VCD dump at cycle N (default 0)\n"
         "  -c, --cycles N     Cycle timeout; 0 = unlimited (default 100M)\n"
         "  --pmem-size N      Program memory size in bytes (default 41984)\n"
@@ -285,12 +358,8 @@ int main(int argc, char** argv)
     dmem.load(recs, DMEM_BASE, dmem_size);
 
     tracer_enabled = !vcd_path.empty();
-    if (tracer_enabled) {
-        Verilated::traceEverOn(true);
-        tracer_g = new VerilatedVcdC;
-        top.trace(tracer_g, 99);
-        tracer_g->open(vcd_path.c_str());
-    }
+    if (tracer_enabled)
+        CHECK_F(tracer_g.open(vcd_path.c_str()), "Cannot open VCD file: %s", vcd_path.c_str());
 
     struct sigaction sa{};
     sa.sa_handler = sig_handler;
@@ -327,10 +396,11 @@ int main(int argc, char** argv)
             }
             if (top.cpuoff && --cpuoff_drain <= 0)
                 done = true;
-        }
 
-        if (tracer_enabled && mainTime / CLOCK_PERIOD >= dump_start)
-            tracer_g->dump(mainTime);
+            if (tracer_enabled && cycle >= dump_start)
+                tracer_g.sample(cycle, top.trace_pc, top.trace_decode,
+                                top.trace_exec_done, top.trace_ipe_executing);
+        }
 
         mainTime++;
     }
@@ -345,8 +415,7 @@ int main(int argc, char** argv)
                result == status_timeout ? "timeout" : "aborted",
                (unsigned long long)done_cycles);
 
-    // Destroy model before tracer so Verilator can finalize any pending trace data
     top_g.reset();
-    if (tracer_g) { tracer_g->close(); delete tracer_g; tracer_g = nullptr; }
+    tracer_g.close();
     return result;
 }
