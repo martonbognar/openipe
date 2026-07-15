@@ -2,3 +2,4 @@ logs/
 *.swp
 *.o
 .venv/
+.vscode

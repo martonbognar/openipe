@@ -2,12 +2,12 @@ OUTPUT_ARCH(msp430)
 
 MEMORY {
   SFR              : ORIGIN = 0x0000, LENGTH = 0x0010 /* END=0x0010, size 16 */
-  RAM              : ORIGIN = PER_SIZE, LENGTH = DMEM_SIZE /* END=0x09FF, size 2048 */
+  RAM              : ORIGIN = PER_SIZE, LENGTH = DMEM_SIZE
   INFOMEM          : ORIGIN = 0x1000, LENGTH = 0x0100 /* END=0x10FF, size 256 as 2 128-byte segments */
   INFOA            : ORIGIN = 0x1080, LENGTH = 0x0080 /* END=0x10FF, size 128 */
   INFOB            : ORIGIN = 0x1000, LENGTH = 0x0080 /* END=0x107F, size 128 */
 
-  ROM (rx)         : ORIGIN = PMEM_BASE, LENGTH = PMEM_SIZE /* END=0xFFDF, size 61152 */
+  ROM (rx)         : ORIGIN = PMEM_BASE, LENGTH = PMEM_SIZE 
 
   bootcode  (rwx)   : ORIGIN = BMEM_BASE, LENGTH = BMEM_TOTAL_SIZE
   bootcode_ivt (rw) : ORIGIN = BMEM_IVT_BASE, LENGTH = 0x20
@@ -285,13 +285,22 @@ SECTIONS
     __ipe_rw_start = .;
     *(.ipe_vars*)      /* IPE variables                     */
   }  > ipe_seg
+  
+  .ipe_heap :
+  {
+    . = ALIGN(2);
+    PROVIDE(ipe_heap_START = .);
+    . += 0x1000;
+    PROVIDE(ipe_heap_END = .);
+  } > ipe_seg
+
   .ipe_stack :
   {
       . = ALIGN(2);
       PROVIDE (ipe_sp = .);
       . += 2;
       /* NOTE: ensure IPE stack is large enough(!) */
-      . += 0x4000;
+      . += 0x3400;
       PROVIDE(ipe_base_stack = .);
      . += 2;
   } > ipe_seg
@@ -305,7 +314,7 @@ SECTIONS
   .ipe_vectors  :
   {
      PROVIDE (__ipe_vectors_start = .) ;
-    *(.ipe_vectors*)
+    KEEP(*(.ipe_vectors*))
      _ipe_vectors_end = . ;
   }  > ipe_vectors
 

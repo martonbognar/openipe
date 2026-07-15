@@ -5,9 +5,8 @@ RTL_SIM_DIR = ../rtl_sim
 TOPLEVEL  = tb_openMSP430
 EXE_NAME  = ipe-sim
 
-ifndef BUILD_DIR
-  BUILD_DIR = build
-endif
+BUILD_DIR ?= build
+BOOTCODE_NAME ?= bootcode.s43
 
 EXE_FILE      = $(BUILD_DIR)/$(EXE_NAME)
 BOOTCODE_ELF  = $(BUILD_DIR)/bootcode.elf
@@ -34,6 +33,20 @@ VERILOG_INCLUDES = \
     -I$(RTL_DIR)/periph \
     -I$(BENCH_DIR)
 
+EXTRA_IPE_FLAG=
+ifdef __OMIT_IPE_FIXES
+	EXTRA_IPE_FLAG+= -DOMIT_IPE_FIXES
+endif
+ifdef __OMIT_SP_SWITCHING
+	EXTRA_IPE_FLAG+= -DOMIT_SP_SWITCHING
+endif
+ifdef __IPE_IRQ_SW
+	EXTRA_IPE_FLAG+= -DSECURE_IRQ_SW
+endif
+ifdef __IPE_IRQ_FW
+	EXTRA_IPE_FLAG += -DSECURE_IRQ_FW 
+endif
+
 DEPS = $(abspath main.cpp) \
        $(abspath loguru/loguru.cpp)
 
@@ -53,28 +66,14 @@ $(VERILATOR_HDR): $(BENCH_DIR)/$(TOPLEVEL).v $(RTL_DIR)/openMSP430_defines.v FOR
 	    $(VERILOG_INCLUDES) \
 	    $(BENCH_DIR)/$(TOPLEVEL).v \
 	    $(DEPS) \
+		$(EXTRA_IPE_FLAG) \
 	    -o $(EXE_NAME)
 
 # ── Bootcode ──────────────────────────────────────────────────────────────────
 
-# pmem_defs.asm — symbols used by bootcode.s43: PMEM_BASE (size-dependent)
-# plus fixed hardware IPE register addresses (from template_defs.asm)
-$(BUILD_DIR)/pmem_defs.asm: | $(BUILD_DIR)
-	printf '.set PMEM_BASE, %d\n.set MPUIPC0, 0x05AA\n.set MPUIPSEGB2, 0x05AC\n.set MPUIPSEGB1, 0x05AE\n' \
-	    $(PMEM_BASE) > $@
-
-# Prepend ld symbol definitions to ipe_linker.x so the linker resolves PMEM_BASE etc.
-$(BUILD_DIR)/bootcode.x: $(RTL_SIM_DIR)/bin/ipe_linker.x | $(BUILD_DIR)
-	printf 'PMEM_BASE = %d;\nPMEM_SIZE = %d;\nDMEM_SIZE = %d;\nPER_SIZE = %d;\nBMEM_BASE = %d;\nBMEM_TOTAL_SIZE = %d;\nBMEM_IVT_BASE = %d;\nBMEM_TRAMPOLINE_BASE = %d;\n' \
-	    $(PMEM_BASE) $(PMEM_SIZE) $(DMEM_SIZE) $(PER_SIZE) \
-	    $(BMEM_BASE) $(BMEM_SIZE) $(BMEM_IVT_BASE) $(BMEM_TRAMPOLINE_BASE) > $@
-	cat $< >> $@
-
-$(BOOTCODE_ELF): $(BUILD_DIR)/pmem_defs.asm $(BUILD_DIR)/bootcode.x
-	cd $(BUILD_DIR) && msp430-elf-as -alsm \
-	    $(abspath $(RTL_SIM_DIR)/src/ipe/bootcode.s43) \
-	    -o bootcode.o > bootcode.l43
-	msp430-elf-ld -T $(BUILD_DIR)/bootcode.x $(BUILD_DIR)/bootcode.o -o $@
+$(BOOTCODE_ELF): $(BUILD_DIR)
+	cd $(RTL_SIM_DIR)/bin && ./build_bootcode.sh $(BOOTCODE_NAME)
+	cp $(RTL_SIM_DIR)/bin/bootcode.elf $(BOOTCODE_ELF)
 
 $(BUILD_DIR):
 	mkdir -p $@
