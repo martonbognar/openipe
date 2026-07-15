@@ -1,0 +1,6 @@
+*.o
+*.elf
+*.l43
+pmem.*
+generated_*
+stimulus.v

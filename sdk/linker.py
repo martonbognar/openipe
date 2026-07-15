@@ -10,7 +10,13 @@ from jinja2 import Template
 from common import *
 
 CC = "msp430-elf-gcc"
-FLAGS = ['-mmcu=msp430f149', '-mhwmult=none', f'-Wa,-I,{Path(os.path.dirname(__file__)).absolute()}/libipe/stubs']
+FLAGS = [
+    '-mmcu=msp430f149', 
+    '-mhwmult=none', 
+    f'-Wa,-I,{Path(os.path.dirname(__file__)).absolute()}/libipe/stubs', 
+    '-Os',
+    '-D__extension__= '
+]
 
 # Valid memory sizes — must match openMSP430_defines.v
 PMEM_SIZES = ['1K', '2K', '4K', '8K', '12K', '16K', '24K', '32K',
@@ -107,8 +113,23 @@ def main():
                         metavar='SIZE', help='Data memory size (default: %(default)s)')
     parser.add_argument('--config', type=Path, default=None,
                         metavar='FILE', help='Config JSON file (default: config.json if present)')
+    parser.add_argument('--dumb-memory-stub', default=False, action='store_true',
+                        help='Use simple memory stub (default: False)')
+    parser.add_argument('--ipe-step', default=False, action='store_true',
+                        help='Use IPE-step (default: False)')
+    
+    parser.add_argument('--init-latency', default=0x2C,
+                        help='IPE-step init latency (default: 0x2C)')
+    parser.add_argument('--step-latency', default=0x2B,
+                        help='IPE-step (default: 0x2B)')
+    parser.add_argument('--nb-step', default=10,
+                        help='Number of instructions to step with IPE-step (default: 10)')
 
     args, cli_ld_args = parser.parse_known_args()
+
+    FLAGS.append(f'-DINIT_LATENCY={args.init_latency}')
+    FLAGS.append(f'-DSSTEP_LATENCY={args.step_latency}')
+    FLAGS.append(f'-DNB_INSTR={args.nb_step}')
 
     pmem_x = _write_linker_script(_parse_size(args.pmem_size), _parse_size(args.dmem_size))
     cli_ld_args = [pmem_x if a == 'pmem.x' else a for a in cli_ld_args]
@@ -126,6 +147,15 @@ def main():
 
     files_to_compile = [get_libipe_path('stubs/' + default_config['entry_stub'])]
     files_to_compile.append(get_libipe_path('stubs/ipe-libc.c'))
+    
+    if args.dumb_memory_stub:
+        files_to_compile.append(get_libipe_path('ipe-memory-dumb.c'))
+    else:
+        files_to_compile.append(get_libipe_path('ipe-memory.c'))
+    
+    if args.ipe_step:
+        files_to_compile.append(get_libipe_path('ipe-step.c'))
+
     files_to_compile.append(get_libipe_path('sim_io.c'))
 
     # write generated table file
@@ -155,7 +185,10 @@ def main():
     for file in files_to_compile:
         out = get_tmp(suffix='.o', prefix=file.stem)
         additional_files_to_link.append(out)
-        call_prog(CC, FLAGS + ['-c', str(file), '-o', additional_files_to_link[-1]])
+        if(str(file).endswith('.c')):
+            call_prog(f"{os.path.dirname(os.path.realpath(__file__))}/compiler.py", FLAGS + ['-c', str(file), '-o', additional_files_to_link[-1]])
+        else:    
+            call_prog(CC, FLAGS + ['-c', str(file), '-o', additional_files_to_link[-1]])
 
     linker_args = cli_ld_args
     for object_name in additional_files_to_link:

@@ -1,0 +1,5 @@
+*.o
+*.elf
+pmem.*
+generated_*
+coucou.vcd

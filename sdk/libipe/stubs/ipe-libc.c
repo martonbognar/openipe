@@ -12,7 +12,7 @@
 
 typedef unsigned int size_t;
 
-void * IPE_FUNC
+IPE_FUNC void *
 __ipememset (void *d, int c, size_t n)
 {
   char *dst = (char *) d;
@@ -22,7 +22,7 @@ __ipememset (void *d, int c, size_t n)
 }
 
 
-void * IPE_FUNC
+IPE_FUNC void *
 __ipememcpy (void *d, const void *s, size_t n)
 {
   char *dst = (char *) d;
@@ -33,7 +33,7 @@ __ipememcpy (void *d, const void *s, size_t n)
 }
 
 
-void * IPE_FUNC
+IPE_FUNC void *
 __ipememmove(void *dst, const void *src, size_t len)
 {
   char *d = dst;

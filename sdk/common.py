@@ -1,6 +1,7 @@
 import subprocess
 import tempfile
 import os
+import errno
 import sys
 import shutil
 import atexit
@@ -53,7 +54,7 @@ def call_prog(prog, arguments=[], get_output=False):
         else:
             subprocess.check_call(cmd)
     except OSError as e:
-        if e.errno == os.errno.ENOENT:
+        if e.errno == errno.ENOENT:
             fatal_error('{} is not in your PATH'.format(prog))
         else:
             fatal_error('Error running {}: {}'.format(prog, e))

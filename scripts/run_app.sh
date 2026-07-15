@@ -13,16 +13,27 @@
 set -e
 
 APP="${1:?usage: $0 <app-name>}"
+USE_STEP="${2:-0}"
 
 SIM_DIR=/openipe/core/sim/verilator
 
-make -C "$SIM_DIR"
+if [ $USE_STEP -eq 1 ]; then 
+    make -C "$SIM_DIR" clean
+
+    export BOOTCODE_NAME=bootcode-clean-irq.s43
+    make -C "$SIM_DIR" __IPE_IRQ_FW=1
+else
+    make -C "$SIM_DIR"
+fi
+
+make -C "/openipe/app/$APP" clean
 make -C "/openipe/app/$APP"
 
 # Stream output live (line-buffered) while also capturing it for the FAIL check.
 log=$(mktemp)
 stdbuf -oL -eL "$SIM_DIR/build/ipe-sim" \
     --firmware "$SIM_DIR/build/bootcode.elf" \
+    --pmem-size 49152 \
     "/openipe/app/$APP/$APP.elf" 2>&1 | tee "$log"
 ret=${PIPESTATUS[0]}
 
