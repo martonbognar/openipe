@@ -27,14 +27,18 @@ jobs:
           context: .
           file: "Dockerfile"
           tags: openipe:latest
-          push: false
-          outputs: type=docker,dest=/tmp/openipe-docker.tar
+          load: true
+
+      - name: Export Docker image
+        run: docker save openipe:latest | gzip > /tmp/openipe-docker.tar.gz
 
       - name: Upload Docker artifact
         uses: actions/upload-artifact@v6
         with:
           name: openipe-docker
-          path: /tmp/openipe-docker.tar
+          path: /tmp/openipe-docker.tar.gz
+          retention-days: 1
+          compression-level: 0
 
   ci-tests:
     name: ${{ matrix.test }}${{ matrix.defines != '' && format(' ({0})', matrix.defines) || '' }}
@@ -125,11 +129,28 @@ jobs:
           options: -v ${{ github.workspace }}/core:/openipe/core -v ${{ github.workspace }}/app:/openipe/app -v ${{ github.workspace }}/sdk:/openipe/sdk -v ${{ github.workspace }}/scripts:/openipe/scripts
           run: ./scripts/run_app.sh ${{ matrix.program }}
 
+  check-docker-compose:
+    name: Check Docker Compose file
+    runs-on: ubuntu-latest
+    needs: build-docker
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+        with:
+          submodules: true
+      - uses: ./.github/actions/setup
+
+      - name: Tag image as published name
+        run: docker tag openipe:latest ghcr.io/${{ github.repository_owner }}/openipe:latest
+
+      - name: Run a simple test inside the container
+        run: docker compose run openipe bash -c "cd /openipe/core/sim/rtl_sim/run/ && ./run_all"
+
   push-image:
     name: Push Docker image
     runs-on: ubuntu-latest
     # only run when build and all tests succeed
-    needs: [build-docker, ci-tests, symbolic-tests, verilator-tests]
+    needs: [build-docker, ci-tests, symbolic-tests, verilator-tests, check-docker-compose]
     if: github.ref == 'refs/heads/main'
     steps:
       - name: Download Docker artifact
@@ -139,7 +160,7 @@ jobs:
           path: /tmp
 
       - name: Load Docker image
-        run: docker load --input /tmp/openipe-docker.tar
+        run: docker load --input /tmp/openipe-docker.tar.gz
 
       - name: Log in to the container registry
         uses: docker/login-action@v4
@@ -153,13 +174,16 @@ jobs:
           docker tag openipe:latest ghcr.io/${{ github.repository_owner }}/openipe:latest
           docker push ghcr.io/${{ github.repository_owner }}/openipe:latest
 
-  check-docker-compose:
-    name: Check Docker Compose file on published image
+  cleanup-artifact:
+    name: Clean up Docker image artifact
     runs-on: ubuntu-latest
-    needs: push-image
+    needs: [ci-tests, symbolic-tests, verilator-tests, check-docker-compose, push-image]
+    if: always()
+    permissions:
+      actions: write
     steps:
-      - name: Check out repository
-        uses: actions/checkout@v6
-
-      - name: Run a simple test inside the container
-        run: docker compose run openipe bash -c "cd /openipe/core/sim/rtl_sim/run/ && ./run_all"
+      - name: Delete Docker image artifact
+        uses: geekyeggo/delete-artifact@v5
+        with:
+          name: openipe-docker
+          failOnError: false

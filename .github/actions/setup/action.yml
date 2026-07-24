@@ -12,4 +12,4 @@ runs:
 
     - name: Load Docker image
       shell: bash
-      run: docker load --input /tmp/openipe-docker.tar
+      run: docker load --input /tmp/openipe-docker.tar.gz
