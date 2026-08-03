@@ -1,3 +1,5 @@
+    .include "ipe_macros.s"
+    
     .global ipe_entry
     .global ipe_ocall
 
@@ -29,9 +31,9 @@
 {% for stub in stubs_to_protected %}
     .global {{ stub.external_name }}
 {{ stub.external_name }}:
-    push r7
+    push_callee_save
     mov #{{ stub.index }}, r7
     call #ipe_entry
-    pop r7
+    pop_callee_save
     ret
 {% endfor %}

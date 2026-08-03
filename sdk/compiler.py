@@ -86,7 +86,7 @@ class ArgumentRegCounter(c_ast.NodeVisitor):
     def visit_Decl(self, node):
         arg_type = node.type
         if isinstance(arg_type, c_ast.PtrDecl):
-            self.reg_used += 2  # for restricted data model
+            self.reg_used += 1  # for restricted data model
         else:
             self.reg_used += self.nb_reg_used(arg_type.type.names)
 
@@ -122,7 +122,7 @@ class IPECollector(c_ast.NodeVisitor):
                             v = ArgumentRegCounter()
                             v.visit(decl.type.args)
                             break_if_stack_passing(decl.type, v.reg_used)
-                        return_regs = ArgumentRegCounter.nb_reg_used(decl.type.type.type.names)
+                        return_regs = ArgumentRegCounter.nb_reg_used(decl.type.type.type.names)           
                         self.entry_functions.append({
                             'internal_name': internal_name,
                             'external_name': function_name,
@@ -158,12 +158,17 @@ class OcallCollector(c_ast.NodeVisitor):
         if (not hasattr(node.name, 'name')):
             return
         funcName = node.name.name
+        future_stubs = ['memcmp', 'memmove', 'memcpy', 'memset']
         # works because function declaration must proceed function call
-        if funcName not in self.ipe_functions and funcName not in self.inline_functions and "__" not in funcName:
-            self.ocall_detected = True
-            self.ocall_functions[funcName] = node
+        if funcName not in self.ipe_functions and funcName not in future_stubs and funcName not in self.inline_functions and "__" not in funcName:
             # change ocalls not declaration, because unprotected --> unprotected calls should not go through stub
-            node.name.name += "_stub"
+            # try used when we have calls inside vars ex (a->b())
+            try:
+                node.name.name += "_stub"
+                self.ocall_detected = True
+                self.ocall_functions[funcName] = node
+            except TypeError:
+                warning(f"Couldn't assign node {funcName}")
         if funcName in self.ipe_functions and funcName in self.ipe_entries_names:
             node.name.name += "_internal"
 
@@ -205,15 +210,18 @@ def parse_arith_calls(file):
     for line in fileinput.input(file, inplace=True):
         if line.strip().startswith('.section'):
             current_section = line.split(',')[0].strip().removeprefix('.section').strip()
+        if line.strip() == '.text':
+            current_section = '.text'
             
-        if re.match(r'.*((memcmp|memmove|memcpy|memset)|__mspabi_).*', line):
-            if current_section == '.ipe_func' or current_section == '.ipe_entry':
-                info(f"Patching {line.removesuffix('\n')} in section {current_section}")
-                line = line.replace('memcmp', '__ipememcmp')
-                line = line.replace('memmove', '__ipememmove')
-                line = line.replace('memcpy', '__ipememcpy')
-                line = line.replace('memset', '__ipememset')
-                line = line.replace('__mspabi_', '__ipe__mspabi_')
+        if re.match(r'.*((memcmp|memmove|memcpy|memset)|#__mspabi_).*', line):
+            if not re.match(r'.*((__ipememcmp|__ipememmove|__ipememcpy|__ipememset)|__ipe__mspabi_).*', line):
+                if current_section == '.ipe_func' or current_section == '.ipe_entry':
+                    info(f"Patching {line.removesuffix('\n')} in section {current_section}")
+                    line = line.replace('memcmp', '__ipememcmp')
+                    line = line.replace('memmove', '__ipememmove')
+                    line = line.replace('memcpy', '__ipememcpy')
+                    line = line.replace('memset', '__ipememset')
+                    line = line.replace('__mspabi_', '__ipe__mspabi_')
                                      
         print(line, end='')
                 
@@ -244,7 +252,7 @@ if __name__ == "__main__":
 
     # Run the input C file through the preprocessor
     file_name = next(
-        os.path.splitext(os.path.basename(x))[0]
+        x.removesuffix(".o")
         for x in sys.argv
         if x.endswith(".o")
     )

@@ -107,6 +107,8 @@ def main():
                         metavar='SIZE', help='Data memory size (default: %(default)s)')
     parser.add_argument('--config', type=Path, default=None,
                         metavar='FILE', help='Config JSON file (default: config.json if present)')
+    parser.add_argument('--dumb-memory-stub', default=False, action='store_true',
+                        help='Use simple memory stub (default: False)')
 
     args, cli_ld_args = parser.parse_known_args()
 
@@ -126,6 +128,11 @@ def main():
 
     files_to_compile = [get_libipe_path('stubs/' + default_config['entry_stub'])]
     files_to_compile.append(get_libipe_path('stubs/ipe-libc.c'))
+
+    if args.dumb_memory_stub:
+        files_to_compile.append(get_libipe_path('ipe-memory-dumb.c'))
+    else:
+        files_to_compile.append(get_libipe_path('ipe-memory.c'))
     files_to_compile.append(get_libipe_path('sim_io.c'))
 
     # write generated table file
@@ -155,7 +162,10 @@ def main():
     for file in files_to_compile:
         out = get_tmp(suffix='.o', prefix=file.stem)
         additional_files_to_link.append(out)
-        call_prog(CC, FLAGS + ['-c', str(file), '-o', additional_files_to_link[-1]])
+        if(str(file).endswith('.c')):
+            call_prog(f"{os.path.dirname(os.path.realpath(__file__))}/compiler.py", FLAGS + ['-c', str(file), '-o', additional_files_to_link[-1]])
+        else:    
+            call_prog(CC, FLAGS + ['-c', str(file), '-o', additional_files_to_link[-1]])
 
     linker_args = cli_ld_args
     for object_name in additional_files_to_link:
