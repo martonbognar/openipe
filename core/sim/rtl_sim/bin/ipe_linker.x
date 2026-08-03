@@ -305,7 +305,7 @@ SECTIONS
   .ipe_vectors  :
   {
      PROVIDE (__ipe_vectors_start = .) ;
-    *(.ipe_vectors*)
+    KEEP(*(.ipe_vectors*))
      _ipe_vectors_end = . ;
   }  > ipe_vectors
 
