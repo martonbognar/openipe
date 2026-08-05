@@ -142,4 +142,10 @@
     rla \REG
     .endm
 
+; check whether padding number is saved (indicates return from isr/IPE-interrupt)
+.macro get_padding REG
+    get_ipe_end \REG
+    mov -34(\REG), \REG
+    .endm
+
 .endif

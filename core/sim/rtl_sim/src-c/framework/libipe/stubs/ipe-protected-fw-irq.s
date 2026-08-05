@@ -74,13 +74,8 @@ ipe_ocall:
     br #ipe_ocall_cont
 
 ocall_ret:
-    mov &__MPUIPSEGB2, r4
-    rla r4
-    rla r4
-    rla r4
-    rla r4
     ; check whether padding number is saved (return from isr)
-    mov -34(r4), r5
+    get_padding r5
     cmp #0, r5
     jeq return_from_ocall
 return_from_isr:
@@ -123,11 +118,12 @@ irq_dispatch:
     br r8
 
 irq_dispatch_ret:
-    cmp #1, r9
-    jeq ocall_ret
+    get_padding r9
+    cmp #0, r9
+    jne ocall_ret ; padding added from firmware, so return from IPE
     
     clr r6
-    br #ecall_ret
+    br #ecall_ret ; use untrusted stack to reach trampoline
 
 undef_irq:
     reti
